@@ -100,16 +100,32 @@ docker stop weam-nginx 2>/dev/null || true
 docker rm weam-nginx 2>/dev/null || true
 
 # -------------------------------
-# Step 5.5: Ensure Docker network exists
+# Step 5.5: Detect Docker network dynamically
 # -------------------------------
-# echo "🔧 Ensuring Docker network 'weam_app-network' exists..."
-# if ! docker network inspect weam_app-network >/dev/null 2>&1; then
-#     echo "🛠️ Creating Docker network 'weam_app-network'..."
-#     docker network create weam_app-network
-#     echo "✅ Docker network 'weam_app-network' created"
-# else
-#     echo "✅ Docker network 'weam_app-network' already exists"
-# fi
+echo "🔍 Detecting Docker network..."
+
+# Try to get network from running frontend container
+if docker inspect weam-frontend-container >/dev/null 2>&1; then
+    DOCKER_NETWORK=$(docker inspect weam-frontend-container --format='{{range $net,$v := .NetworkSettings.Networks}}{{$net}}{{end}}')
+    echo "✅ Detected network from frontend container: $DOCKER_NETWORK"
+else
+    # Fallback: look for app-network variations
+    echo "⚠️  Frontend container not running, checking for existing networks..."
+    DOCKER_NETWORK=$(docker network ls --format '{{.Name}}' | grep -E 'app-network$' | head -n 1)
+    
+    if [ -z "$DOCKER_NETWORK" ]; then
+        echo "❌ Could not find Docker network. Please ensure docker-compose services are running."
+        echo "   Run: docker-compose up -d"
+        exit 1
+    fi
+    echo "✅ Using network: $DOCKER_NETWORK"
+fi
+
+# Verify the network exists
+if ! docker network inspect "$DOCKER_NETWORK" >/dev/null 2>&1; then
+    echo "❌ Network '$DOCKER_NETWORK' does not exist"
+    exit 1
+fi
 
 # -------------------------------
 # Step 6: Build and run nginx container (local only)
@@ -118,16 +134,17 @@ if [ "$ENVIRONMENT_TYPE" = "local" ]; then
     echo "🐳 Building nginx Docker image..."
     docker build -t weam-nginx:latest ./nginx
 
-    echo "🚀 Starting nginx container..."
+    echo "🚀 Starting nginx container on network: $DOCKER_NETWORK..."
     docker run -d \
         --name weam-nginx \
-        --network weam_app-network \
+        --network "$DOCKER_NETWORK" \
         -p 80:80 \
         -p 443:443 \
         -e DOMAIN_NAME="$DOMAIN" \
         weam-nginx:latest
 
     echo "✅ Local nginx setup completed successfully!"
+    echo "🌐 Nginx is now running on network: $DOCKER_NETWORK"
 fi
 
 echo "🎉 Setup Finished!"
