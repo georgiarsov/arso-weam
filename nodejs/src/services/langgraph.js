@@ -379,9 +379,21 @@ async function callModel(state, model, data, agentDetails = null) {
         }
         
         // Add current messages (the new user query)
-        const currentMessages = messages.map(msg => 
-            Array.isArray(msg) ? new HumanMessage(msg[1]) : msg
-        );
+        // Convert array tuples to proper LangChain message objects for Gemini compatibility
+        const currentMessages = messages.map(msg => {
+            if (Array.isArray(msg)) {
+                const [role, content] = msg;
+                if (role === 'system') {
+                    return new SystemMessage(content);
+                } else if (role === 'assistant' || role === 'ai') {
+                    return new AIMessage(content);
+                } else {
+                    // Default to HumanMessage for 'user' or any other role
+                    return new HumanMessage(content);
+                }
+            }
+            return msg;
+        });
         context.push(...currentMessages);
         
         
@@ -392,8 +404,8 @@ async function callModel(state, model, data, agentDetails = null) {
     
     // Add SystemMessage with customInstruction if brain has customInstruction
     if (brainData && brainData.customInstruction && brainData.customInstruction.trim()) {
-        if (isAnthropicProvider) {
-            // For Anthropic: convert additional system prompt to human message to avoid multiple system prompts
+        if (isAnthropicProvider || isGeminiProvider) {
+            // For Anthropic/Gemini: convert additional system prompt to human message to avoid multiple system prompts
             // Check if there's already a system message in context
             const hasSystemMessage = context.some(msg =>
                 (msg.constructor && msg.constructor.name === 'SystemMessage') ||
@@ -404,18 +416,59 @@ async function callModel(state, model, data, agentDetails = null) {
             if (hasSystemMessage) {
                 // Convert customInstruction to human message format
                 const customInstructionAsHuman = `Please note these additional instructions: ${brainData.customInstruction}`;
-                context.push(['user', customInstructionAsHuman]);
+                // Use proper LangChain message object instead of tuple for Gemini compatibility
+                context.push(new HumanMessage(customInstructionAsHuman));
             } else {
                 // No existing system message, can add as system
                 const systemMessage = new SystemMessage(brainData.customInstruction);
-                context.unshift(['system', systemMessage.content]);
+                context.unshift(systemMessage);
             }
         } else {
-            // For other providers: use original logic
+            // For other providers: use proper LangChain message objects
             const systemMessage = new SystemMessage(brainData.customInstruction);
-            context.unshift(['system', systemMessage.content]);
+            context.unshift(systemMessage);
         }
     }
+    
+    // IMPORTANT: Ensure all messages are proper LangChain message objects for Gemini compatibility
+    // Convert any remaining tuples or invalid message formats to proper LangChain objects
+    context = context.map(msg => {
+        // Skip if already a proper LangChain message object
+        if (msg && msg.constructor && ['SystemMessage', 'HumanMessage', 'AIMessage', 'ToolMessage'].includes(msg.constructor.name)) {
+            return msg;
+        }
+        
+        // Convert array tuples to proper message objects
+        if (Array.isArray(msg) && msg.length >= 2) {
+            const [role, content] = msg;
+            if (role === 'system') {
+                return new SystemMessage(content);
+            } else if (role === 'assistant' || role === 'ai') {
+                return new AIMessage(content);
+            } else {
+                // Default to HumanMessage for 'user' or any other role
+                return new HumanMessage(content);
+            }
+        }
+        
+        // Handle objects with type/role properties
+        if (msg && typeof msg === 'object') {
+            const role = msg.type || msg.role || msg._getType?.();
+            const content = msg.content || msg.text || '';
+            
+            if (role === 'system') {
+                return new SystemMessage(content);
+            } else if (role === 'ai' || role === 'assistant') {
+                return new AIMessage(content);
+            } else if (role === 'human' || role === 'user') {
+                return new HumanMessage(content);
+            }
+        }
+        
+        // Fallback: wrap unknown message as HumanMessage to prevent errors
+        logger.warn(`Unknown message format in context, converting to HumanMessage:`, typeof msg);
+        return new HumanMessage(String(msg?.content || msg || ''));
+    }).filter(msg => msg && msg.content); // Remove any null/undefined/empty messages
     
     // Log the context being sent to LLM for debugging
     context.forEach((msg, idx) => {
