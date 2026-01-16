@@ -1,6 +1,6 @@
 const { ChatOpenAI } = require('@langchain/openai');
 const { StateGraph, END } = require('@langchain/langgraph');
-const { ToolMessage, HumanMessage, SystemMessage } = require('@langchain/core/messages');
+const { ToolMessage, HumanMessage, SystemMessage, AIMessage } = require('@langchain/core/messages');
 const { langGraphEventName, llmStreamingEvents, toolCallOptions, toolDescription, IS_MCP_TOOLS } = require('../config/constants/llm');
 const { SOCKET_EVENTS, SOCKET_ROOM_PREFIX } = require('../config/constants/socket');
 const Messages = require('../models/thread');
@@ -453,7 +453,7 @@ async function callModel(state, model, data, agentDetails = null) {
     
     return { messages: [response] };
 }
-
+  
 async function callTool(state, agentDetails = null, userData = null) {
     const { messages } = state;
     const lastMessage = messages[messages.length - 1];
@@ -770,7 +770,8 @@ async function llmFactory(modelName, opts = {}) {
                 const geminiLLM = new ChatGoogleGenerativeAI({
                     ...baseConfig,
                     apiKey: opts.apiKey,
-                    model: modelName, // Explicitly set the model name
+                    model: modelName,
+                    convertSystemMessageToHuman: true, // Handle SystemMessage in conversation
                 });
                 
                 // Only bind tools if query needs them
