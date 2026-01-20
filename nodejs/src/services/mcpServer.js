@@ -4175,19 +4175,23 @@ async function startMCPServer() {
     server.registerTool(
         "update_n8n_workflow",
         {
-            description: "Update an existing n8n workflow. All the fields are optional.",
+            description: "This tool updates an existing n8n workflow by first retrieving the current workflow using get_n8n_workflow and then analyzing the user’s request to determine the minimal required changes. It always starts from the existing workflow data and never creates a new workflow unless the user explicitly requests a full replacement. Only the nodes, connections, name, or settings explicitly mentioned by the user are modified. If the user requests a change to a specific node, only that node is updated or replaced; when a node is replaced, its full configuration and relevant connections are regenerated while the rest of the workflow remains unchanged. If the user requests to replace one node with another, the tool removes the old node, adds the new node, and updates only the affected connections. If the user explicitly requests to replace the entire workflow, the tool generates a completely new workflow and overwrites all nodes, connections, name, and settings. The tool returns the updated values for name, nodes, connections, and settings based on the applied changes.",
             inputSchema: {
-                user_id: z.string().optional().describe("User ID to get n8n API key from. If not provided, the default user will be used."),
                 workflow_id: z.string().describe("ID of the workflow to update"),
-                name: z.string().optional().describe("New name for the workflow"),
-                nodes: z.array(z.any()).optional().describe("Updated list of nodes"),
-                connections: z.record(z.any()).optional().describe("Updated connections"),
-                active: z.boolean().optional().describe("Whether the workflow should be active")
+                name: z.string().describe("New name for the workflow"),
+                user_id: z.string().optional().describe("User ID to get n8n API key from. If not provided, the default user will be used."),
+                // current_workflow: z.record(z.any()).describe("Current workflow JSON data (required - obtain this from get_n8n_workflow tool first)"),
+                connections: z.any().describe("Updated connections"),
+                nodes: z.any().describe("Updated list of nodes"),
+                // settings: z.any().describe("Updated workflow settings object"),
+                // active: z.boolean().optional().describe("Whether the workflow should be active"),
+                // staticData: z.any().optional().describe("Updated static data as JSON string or object"),
+                // shared: z.array(z.any()).optional().describe("Updated array of shared workflow objects")
             }
         },
-        async ({ user_id = null, workflow_id, name = null, nodes = null, connections = null, active = null }) => {
+        async ({ user_id = null, workflow_id, name = null, nodes = null, connections = null, active = null, settings = null, staticData = null, shared = null }) => {
             try {
-                const result = await n8nTools.updateN8nWorkflow(user_id, workflow_id, name, nodes, connections, active);
+                const result = await n8nTools.updateN8nWorkflow(user_id, workflow_id, name, nodes, connections, active, settings, staticData, shared);
                 return {
                     content: [{
                         type: "text",
