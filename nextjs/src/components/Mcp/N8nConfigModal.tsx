@@ -70,7 +70,6 @@ const N8nConfigModal: React.FC<N8nConfigModalProps> = ({ isOpen, onClose, onConn
                 connectedAt: new Date().toISOString(),
                 status: 'connected'
             };
-            console.log("🚀 ~ handleConnect ~ payload:", payload)
 
             // Add API base URL if provided (for self-hosted instances)
             if (apiBaseUrl.trim() && apiBaseUrl.trim() !== 'https://api.n8n.io/v1') {

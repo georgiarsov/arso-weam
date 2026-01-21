@@ -38,18 +38,18 @@ async function makeN8nRequest(endpoint, apiKey, params = null, jsonData = null, 
         console.log(`Making ${method} request to n8n API: ${url}`);
 
         if (method === 'GET') {
-            response = await axios.get(url, { headers, params, timeout: 30000 });
+            response = await axios.get(url, { headers, params, timeout: 60000 });
         } else if (method === 'POST') {
-            response = await axios.post(url, jsonData, { headers, params, timeout: 30000 });
+            response = await axios.post(url, jsonData, { headers, params, timeout: 60000 });
         } else if (method === 'PUT') {
-            response = await axios.put(url, jsonData, { headers, params, timeout: 30000 });
+            response = await axios.put(url, jsonData, { headers, params, timeout: 60000 });
         } else if (method === 'DELETE') {
-            response = await axios.delete(url, { headers, timeout: 30000 });
+            response = await axios.delete(url, { headers, timeout: 60000 });
         } else if (method === 'PATCH') {
-            response = await axios.patch(url, jsonData, { headers, params, timeout: 30000 });
+            response = await axios.patch(url, jsonData, { headers, params, timeout: 60000 });
         }
 
-        console.log(`Successfully received response from n8n API: ${endpoint}, url: ${url}`);
+        console.log(`Successfully received response from n8n API: ${endpoint}, url: ${url}`, "data");
         return response.data;
     } catch (error) {
         const errorDetails = {
@@ -145,9 +145,10 @@ async function listN8nWorkflows(userId = null, limit = 100) {
  * Get details of a specific workflow
  * @param {string} userId - User ID to get API key from
  * @param {string} workflowId - ID of the workflow to retrieve
- * @returns {string} Formatted workflow details
+ * @param {boolean} raw - If true, return raw workflow data object instead of formatted string
+ * @returns {string|Object} Formatted workflow details or raw workflow data
  */
-async function getN8nWorkflow(userId = null, workflowId) {
+async function getN8nWorkflow(userId = null, workflowId, raw = false) {
     if (!userId) {
         return 'Error: User ID is required. Please provide user authentication.';
     }
@@ -157,11 +158,17 @@ async function getN8nWorkflow(userId = null, workflowId) {
     }
 
     const data = await makeN8nRequest(`workflows/${workflowId}`, config.apiKey, null, null, 'GET', config.apiBaseUrl);
-    
+
     if (!data) {
-        return `Failed to get workflow: ${workflowId}`;
+        return raw ? null : `Failed to get workflow: ${workflowId}`;
     }
 
+    // If raw data is requested, return the raw object
+    if (raw) {
+        return data;
+    }
+
+    // Otherwise, format the data for display
     const tags = data.tags ? data.tags.join(', ') : 'No tags';
     const nodeCount = data.nodes ? data.nodes.length : 0;
     const connectionCount = data.connections ? Object.keys(data.connections).length : 0;
@@ -333,6 +340,7 @@ async function createN8nWorkflow(userId = null, name, nodes, connections = null,
     return result;
 }
 
+
 /**
  * Update an existing workflow
  * @param {string} userId - User ID to get API key from
@@ -341,9 +349,15 @@ async function createN8nWorkflow(userId = null, name, nodes, connections = null,
  * @param {Array} nodes - Updated list of nodes
  * @param {Object} connections - Updated connections
  * @param {boolean} active - Whether the workflow should be active
+ * @param {Object} settings - Updated workflow settings
+ * @param {string|null} staticData - Updated static data as JSON string or object
+ * @param {Array} shared - Updated array of shared workflow objects
  * @returns {string} Formatted updated workflow information
+ *
+ * API Reference: https://docs.n8n.io/api/api-reference/#tag/workflow/PUT/workflows/{id}
  */
-async function updateN8nWorkflow(userId = null, workflowId, name = null, nodes = null, connections = null, active = null) {
+async function updateN8nWorkflow(userId = null, workflowId, name = null, nodes = null, connections = null, active = null, settings = {}, staticData = null, shared = null) {
+    console.log(`Updating workflow ${workflowId} with name: ${name}, nodes: ${nodes}, connections: ${connections}, active: ${active}, settings: ${settings}, staticData: ${staticData}, shared: ${shared}`);
     if (!userId) {
         return 'Error: User ID is required. Please provide user authentication.';
     }
@@ -352,23 +366,68 @@ async function updateN8nWorkflow(userId = null, workflowId, name = null, nodes =
         return 'Error: n8n API key not found. Please configure your n8n integration in your profile settings.';
     }
 
-    const updateData = {};
-    if (name !== null) updateData.name = name;
-    if (nodes !== null) updateData.nodes = nodes;
-    if (connections !== null) updateData.connections = connections;
-    if (active !== null) updateData.active = active;
+    // Start with the current workflow data as the base
+    const updateData = {name, nodes, connections, settings};
 
-    const data = await makeN8nRequest(`workflows/${workflowId}`, config.apiKey, null, updateData, 'PUT', config.apiBaseUrl);
-    
+    // Remove fields that shouldn't be sent in update (like timestamps, id, etc.)
+    delete updateData.id;
+    delete updateData.createdAt;
+    delete updateData.updatedAt;
+    delete updateData.versionId;
+    delete updateData.usedCredentials;
+
+    // Apply updates only for fields that are explicitly provided
+    if (name !== null && name !== undefined) updateData.name = name;
+    if (nodes !== null && nodes !== undefined) updateData.nodes = nodes;
+    if (connections !== null && connections !== undefined) updateData.connections = connections;
+    // if (active !== null && active !== undefined) updateData.active = active;
+    // if (settings !== null && settings !== undefined) updateData.settings = settings;
+    // if (staticData !== null && staticData !== undefined) updateData.staticData = staticData;
+    // if (shared !== null && shared !== undefined) updateData.shared = shared;
+
+    console.log(`Updating workflow ${workflowId} with merged payload:`, JSON.stringify(updateData, null, 2));
+
+    const data = await makeN8nRequest(`workflows/${workflowId}`, config.apiKey, null, {...updateData,settings:{}}, 'PUT', config.apiBaseUrl);
+
     if (!data) {
         return `Failed to update workflow: ${workflowId}`;
     }
 
-    let result = `**Updated Workflow:**\n\n`;
+    // Build comprehensive update summary
+    let result = `**Workflow Update Summary:**\n\n`;
+
+    // Show original workflow state for context
+    result += `**Original Workflow State (before update):**\n`;
+
+    // Show current workflow state
+    result += `**Current Workflow State:**\n`;
     result += `• **ID:** ${data.id || 'unknown'}\n`;
     result += `• **Name:** ${data.name || 'No name'}\n`;
     result += `• **Active:** ${data.active || false}\n`;
-    result += `• **Updated:** ${data.updatedAt || 'unknown'}\n`;
+    result += `• **Updated:** ${data.updatedAt ? new Date(data.updatedAt).toLocaleString() : 'unknown'}\n`;
+
+    if (data.nodes) {
+        result += `• **Nodes:** ${data.nodes.length} node(s)\n`;
+    }
+
+    if (data.connections) {
+        result += `• **Connections:** ${Object.keys(data.connections).length} connection(s)\n`;
+    }
+
+    if (data.settings && Object.keys(data.settings).length > 0) {
+        result += `• **Settings:** Present\n`;
+    }
+
+    if (data.staticData) {
+        result += `• **Static Data:** Present\n`;
+    }
+
+    if (data.shared && Array.isArray(data.shared) && data.shared.length > 0) {
+        result += `• **Shared:** ${data.shared.length} shared workflow(s)\n`;
+    }
+
+    // Show the complete updated workflow JSON for reference
+    result += `\n**Complete Updated Workflow JSON:**\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\``;
 
     return result;
 }
@@ -724,15 +783,15 @@ async function executeN8nWorkflow(userId = null, workflowId, inputData = null) {
             };
 
             if (httpMethod === 'GET') {
-                response = await axios.get(webhookUrl, { 
-                    headers, 
-                    params: requestBody, 
-                    timeout: 30000 
+                response = await axios.get(webhookUrl, {
+                    headers,
+                    params: requestBody,
+                    timeout: 60000
                 });
             } else {
-                response = await axios.post(webhookUrl, requestBody, { 
-                    headers, 
-                    timeout: 30000 
+                response = await axios.post(webhookUrl, requestBody, {
+                    headers,
+                    timeout: 60000
                 });
             }
 
@@ -833,7 +892,7 @@ async function executeN8nWorkflow(userId = null, workflowId, inputData = null) {
                         'X-N8N-API-KEY': config.apiKey,
                         'Accept': 'application/json'
                     },
-                    timeout: 30000
+                    timeout: 60000
                 });
                 
                 if (runResponse.status === 200) {
@@ -901,7 +960,7 @@ async function executeN8nWorkflow(userId = null, workflowId, inputData = null) {
                         'Origin': baseUrl,
                         'Referer': formUrl
                     },
-                    timeout: 30000,
+                    timeout: 60000,
                     maxRedirects: 5,
                     validateStatus: (status) => status < 600 // Accept all status codes to handle errors manually
                 });
@@ -1067,7 +1126,7 @@ async function executeN8nWorkflow(userId = null, workflowId, inputData = null) {
                     'X-N8N-API-KEY': config.apiKey,
                     'Accept': 'application/json'
                 },
-                timeout: 30000
+                timeout: 60000
             });
             
             if (runResponse.status === 200) {
