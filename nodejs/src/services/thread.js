@@ -800,7 +800,6 @@ const updateThreadFields = async (threadId, updateData) => {
  */
 const updateTokenFields = async (threadId, tokenData) => {
     try {
-        console.log('🔧 [THREAD_REPO] Updating token fields for thread:', threadId);
         
         const updateData = {
             'tokens.totalUsed': tokenData.totalUsed || 0,
@@ -810,15 +809,7 @@ const updateTokenFields = async (threadId, tokenData) => {
             'tokens.imageT': tokenData.imageT || 0
         };
         
-        console.log('📝 [THREAD_REPO] Update data:', updateData);
-
         const success = await updateThreadFields(threadId, updateData);
-        
-        if (success) {
-            console.log('✅ [THREAD_REPO] Token fields updated successfully');
-        } else {
-            console.log('❌ [THREAD_REPO] Failed to update token fields');
-        }
         
         return success;
     } catch (error) {
@@ -860,11 +851,7 @@ const getTokenUsageDict = async (threadId) => {
  */
 const updateTokenUsage = async (threadId, newTokenData) => {
     try {
-        console.log('🔄 [THREAD_REPO] Updating token usage for thread:', threadId);
-        console.log('📝 [THREAD_REPO] New token data:', newTokenData);
-        
         const currentTokens = await getTokenUsageDict(threadId);
-        console.log('📊 [THREAD_REPO] Current tokens:', currentTokens);
         
         const updatedTokens = {
             totalUsed: (currentTokens.totalUsed || 0) + (newTokenData.totalUsed || 0),
@@ -879,11 +866,6 @@ const updateTokenUsage = async (threadId, newTokenData) => {
         
         const success = await updateTokenFields(threadId, updatedTokens);
         
-        if (success) {
-            console.log('✅ [THREAD_REPO] Token usage updated successfully');
-        } else {
-            console.log('❌ [THREAD_REPO] Failed to update token usage');
-        }
         
         return success;
     } catch (error) {
@@ -902,20 +884,13 @@ const updateTokenUsage = async (threadId, newTokenData) => {
  */
 const updateToolsTokenData = async (threadId, tokenData, tokensOld = null, additionalData = {}) => {
     try {
-        console.log('💾 [THREAD_REPO] Updating tools token data for thread:', threadId);
-        console.log('📝 [THREAD_REPO] Token data:', tokenData);
-        console.log('🔧 [THREAD_REPO] Additional data:', additionalData);
-
         // If tokensOld is not provided, fetch current tokens
         if (!tokensOld) {
-            console.log('📊 [THREAD_REPO] Fetching current token usage');
             tokensOld = await getTokenUsageDict(threadId);
-            console.log('📈 [THREAD_REPO] Current tokens:', tokensOld);
         }
 
         // Ensure tokensOld is not null and has required properties
         if (!tokensOld || typeof tokensOld !== 'object') {
-            console.warn('⚠️ [THREAD_REPO] tokensOld is null or invalid, using default values');
             tokensOld = { ...defaultTokenDict };
         }
 
@@ -928,20 +903,12 @@ const updateToolsTokenData = async (threadId, tokenData, tokensOld = null, addit
             imageT: tokenData.imageT || 0
         };
         
-        console.log('🔢 [THREAD_REPO] Incremental tokens:', incrementalTokens);
-
         // Update with incremental data
         const success = await updateTokenUsage(threadId, incrementalTokens);
         
         if (success) {
-            console.log('✅ [THREAD_REPO] Tools token data updated successfully');
-            
-            // Log the update for debugging
             const updatedTokens = await getTokenUsageDict(threadId);
-            console.log('📊 [THREAD_REPO] Updated token summary:', updatedTokens);
-        } else {
-            console.log('❌ [THREAD_REPO] Failed to update tools token data');
-        }
+        } 
 
         return success;
     } catch (error) {
