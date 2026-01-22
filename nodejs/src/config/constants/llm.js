@@ -28,7 +28,14 @@ const toolCallOptions = {
     RAG_TOOL: 'RAGDocumentSearch',
     AGENT_TOOL: 'AgentConfiguration',
     IMAGE_GENERATION_TOOL: 'dalle_api_wrapper',
+    GEMINI_IMAGE_GENERATION_TOOL: 'gemini_image_generator',
     GENERATING_IMAGE: 'Generating image...',
+}
+
+// Helper to check if a tool name is an image generation tool
+const isImageGenerationTool = (toolName) => {
+    return toolName === toolCallOptions.IMAGE_GENERATION_TOOL ||
+        toolName === toolCallOptions.GEMINI_IMAGE_GENERATION_TOOL;
 }
 
 const toolDescription = {
@@ -258,5 +265,6 @@ module.exports = {
     llmStreamingEvents,
     toolCallOptions,
     toolDescription,
-    IS_MCP_TOOLS
+    IS_MCP_TOOLS,
+    isImageGenerationTool
 }

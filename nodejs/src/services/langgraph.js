@@ -474,11 +474,22 @@ async function callTool(state, agentDetails = null, userData = null) {
                 const mcpTools = IS_MCP_TOOLS.includes(toolCall.name);
                 // For image generation tool, pass the API key from the query data
                 let toolArgs = toolCall.args;
-                if (toolCall.name === 'dalle_api_wrapper' && global.currentQueryData && global.currentQueryData.apiKey) {
+                if (toolCall.name === 'dalle_api_wrapper' && global.currentQueryData && global.currentQueryData.apiKey && global.io.sockets) {
+                    global.io.sockets.emit(SOCKET_EVENTS.LLM_RESPONSE_SEND, {
+                        event: llmStreamingEvents.IMAGE_GENERATION_START,
+                        chunk: toolCallOptions.GENERATING_IMAGE,
+                    });
+
                     const decryptedApiKey = decryptedData(global.currentQueryData.apiKey);
                     toolArgs = { ...toolCall.args, apiKey: decryptedApiKey };
                 }
-                if (toolCall.name === 'gemini_image_generator' && global.currentQueryData && global.currentQueryData.apiKey) {
+                if (toolCall.name === 'gemini_image_generator' && global.currentQueryData && global.currentQueryData.apiKey && global.io.sockets) {
+
+                     global.io.sockets.emit(SOCKET_EVENTS.LLM_RESPONSE_SEND, {
+                        event: llmStreamingEvents.IMAGE_GENERATION_START,
+                        chunk: toolCallOptions.GENERATING_IMAGE,
+                    });
+                    
                     const decryptedApiKey = decryptedData(global.currentQueryData.apiKey);
                     toolArgs = { ...toolCall.args, apiKey: decryptedApiKey };
                 }
@@ -1014,10 +1025,6 @@ async function llmFactory(modelName, opts = {}) {
             threadId: opts.threadId
         }),
     }
-    
-
-    console.log(`🔍 [LLM_FACTORY] Looking for provider ${provider} in llmConfig`);
-    console.log(`🔍 [LLM_FACTORY] Available providers:`, Object.keys(llmConfig));
 
     const selectedLLMFactory = llmConfig[provider];
     if (!selectedLLMFactory) {

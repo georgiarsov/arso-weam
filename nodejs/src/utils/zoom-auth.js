@@ -19,28 +19,26 @@ const ZOOM_API_BASE = 'https://api.zoom.us/v2';
 // Validate configuration on module load
 function validateZoomOAuthConfig() {
   const errors = [];
-  
+
   if (!ZOOM_OAUTH?.CLIENT_ID) {
     errors.push('ZOOM_OAUTH_CLIENT_ID is not set');
   }
-  
+
   if (!ZOOM_OAUTH?.CLIENT_SECRET) {
     errors.push('ZOOM_OAUTH_CLIENT_SECRET is not set');
   }
-  
+
   if (!ZOOM_OAUTH?.REDIRECT_URI) {
     errors.push('ZOOM_OAUTH.REDIRECT_URI is not properly configured');
   }
-  
+
   if (errors.length > 0) {
-    logger.error('[ZoomAuth] Configuration validation failed:', errors);
-    logger.error('[ZoomAuth] Current environment:', process.env.NODE_ENV);
-    logger.error('[ZoomAuth] Base URL:', process.env.BASE_URL);
+    logger.warn(`[ZoomAuth] Configuration validation failed: ${errors}`);
   } else {
     logger.info('[ZoomAuth] Configuration validation passed');
-    logger.debug('[ZoomAuth] Redirect URI:', ZOOM_OAUTH.REDIRECT_URI);
+    logger.debug(`[ZoomAuth] Redirect URI: ${ZOOM_OAUTH.REDIRECT_URI}`);
   }
-  
+
   return errors;
 }
 
@@ -53,15 +51,15 @@ const ZOOM_SCOPES = {
   MEETING_READ: 'meeting:read',
   MEETING_WRITE: 'meeting:write',
   MEETING_UPDATE: 'meeting:update',
-  
+
   // User scopes
   USER_READ: 'user:read',
   USER_WRITE: 'user:write',
-  
+
   // Webinar scopes
   WEBINAR_READ: 'webinar:read',
   WEBINAR_WRITE: 'webinar:write',
-  
+
   // Recording scopes
   RECORDING_READ: 'recording:read',
   RECORDING_WRITE: 'recording:write'
@@ -103,14 +101,14 @@ class ZoomCredentials {
     this.serviceType = serviceType;
     this.access_token = mcpData.access_token ? decryptedData(mcpData.access_token) : null;
     this.refresh_token = mcpData.refresh_token ? decryptedData(mcpData.refresh_token) : null;
-    
+
     // Handle both old format (expires_at) and new format (expiry_date)
     // This provides backward compatibility for users who authenticated before the fix
     this.expiry = mcpData.expiry_date || mcpData.expires_at || mcpData.expiry;
-    
+
     this.client_id = CLIENT_ID;
     this.client_secret = CLIENT_SECRET;
-    
+
     // Handle scopes - can be array or space-separated string (matching Google implementation)
     if (mcpData.scopes) {
       this.scopes = Array.isArray(mcpData.scopes) ? mcpData.scopes : [];
@@ -120,7 +118,7 @@ class ZoomCredentials {
     } else {
       this.scopes = [];
     }
-    
+
     // Log credential initialization for debugging
     logger.debug(`[ZoomCredentials] Initialized for user ${userId}:`, {
       hasAccessToken: !!this.access_token,
@@ -139,16 +137,16 @@ class ZoomCredentials {
     if (!this.access_token) {
       return false;
     }
-    
+
     if (!this.expiry) {
       return true; // No expiry means token is valid
     }
-    
+
     // Add 5-minute buffer for proactive refresh (matching Google behavior)
     const bufferTime = 5 * 60 * 1000; // 5 minutes in milliseconds
     const now = Date.now();
     const expiryTime = typeof this.expiry === 'number' ? this.expiry : new Date(this.expiry).getTime();
-    
+
     return now < (expiryTime - bufferTime);
   }
 
@@ -160,10 +158,10 @@ class ZoomCredentials {
     if (!this.expiry) {
       return false;
     }
-    
+
     const now = Date.now();
     const expiryTime = typeof this.expiry === 'number' ? this.expiry : new Date(this.expiry).getTime();
-    
+
     return now >= expiryTime;
   }
 
@@ -184,7 +182,7 @@ class ZoomCredentials {
     try {
       // Store original scopes to preserve them after refresh
       const originalScopes = this.scopes;
-      
+
       // Prepare refresh token request (matching Zoom OAuth implementation)
       const requestData = {
         grant_type: 'refresh_token',
@@ -211,7 +209,7 @@ class ZoomCredentials {
 
       if (response.status !== 200) {
         const errorData = response.data || {};
-        
+
         logger.error(`[ZoomCredentials] Token refresh failed with status ${response.status}:`, {
           error: errorData.error,
           error_description: errorData.error_description,
@@ -219,7 +217,7 @@ class ZoomCredentials {
           refresh_token_length: this.refresh_token ? this.refresh_token.length : 0,
           refresh_token_preview: this.refresh_token ? `${this.refresh_token.substring(0, 10)}...` : 'null'
         });
-        
+
         if (response.status === 400 && (errorData.error === 'invalid_grant' || errorData.error === 'invalid_request')) {
           throw new ZoomAuthenticationError(
             `Refresh token is invalid or expired. Error: ${errorData.error_description || errorData.error}. User needs to re-authenticate.`,
@@ -227,7 +225,7 @@ class ZoomCredentials {
             errorData
           );
         }
-        
+
         throw new ZoomAuthenticationError(
           `Token refresh failed: ${errorData.error_description || errorData.error || 'Unknown error'}`,
           'TOKEN_REFRESH_FAILED',
@@ -248,18 +246,18 @@ class ZoomCredentials {
 
       // Update credentials with new token
       this.access_token = access_token;
-      
+
       // Calculate new expiry time (Zoom tokens typically expire in 1 hour)
       if (expires_in) {
         this.expiry = Date.now() + (expires_in * 1000);
       }
-      
+
       // Update refresh token if provided (some OAuth providers rotate refresh tokens)
       if (newRefreshToken) {
         logger.debug(`[ZoomCredentials] Received new refresh token`);
         this.refresh_token = newRefreshToken;
       }
-      
+
       // Preserve scopes - Zoom may not return scope on refresh, so keep original scopes
       if (scope) {
         // If new scope is provided, update it
@@ -331,17 +329,17 @@ class ZoomCredentials {
       // Update tokens with encryption
       user.mcpdata[serviceKey].access_token = encryptedData(this.access_token);
       user.mcpdata[serviceKey].expiry_date = this.expiry;
-      
+
       if (this.refresh_token) {
         user.mcpdata[serviceKey].refresh_token = encryptedData(this.refresh_token);
       }
-      
+
       // CRITICAL: Preserve scopes when saving refreshed tokens
       // Zoom doesn't always return scope on refresh, so we need to maintain it
       if (this.scopes && this.scopes.length > 0) {
         // Store as space-separated string (matching OAuth standard)
-        user.mcpdata[serviceKey].scope = Array.isArray(this.scopes) 
-          ? this.scopes.join(' ') 
+        user.mcpdata[serviceKey].scope = Array.isArray(this.scopes)
+          ? this.scopes.join(' ')
           : this.scopes;
         logger.debug(`[ZoomCredentials] Saved scopes: ${user.mcpdata[serviceKey].scope}`);
       }
@@ -384,7 +382,7 @@ class ZoomCredentials {
 async function getCredentials(userId, serviceType = 'zoom', requiredScopes = []) {
   try {
     logger.info(`[getCredentials] Starting credential retrieval for user: ${userId}, service: ${serviceType}, required scopes: ${requiredScopes.length}`);
-    
+
     // Fetch user's MCP data
     const user = await User.findById(userId);
     if (!user || !user.mcpdata) {
@@ -400,7 +398,7 @@ async function getCredentials(userId, serviceType = 'zoom', requiredScopes = [])
     // Use ZOOM as the service key
     const serviceKey = 'ZOOM';
     const mcpData = user.mcpdata[serviceKey];
-    
+
     if (!mcpData) {
       logger.error(`[getCredentials] Zoom authentication data not found for user: ${userId}. Available keys: ${Object.keys(user.mcpdata)}`);
       throw new ZoomAuthenticationError(
@@ -422,7 +420,7 @@ async function getCredentials(userId, serviceType = 'zoom', requiredScopes = [])
     if (requiredScopes && requiredScopes.length > 0) {
       const credentialScopes = credentials.scopes || [];
       const missingScopes = requiredScopes.filter(scope => !credentialScopes.includes(scope));
-      
+
       if (missingScopes.length > 0) {
         logger.warn(`[getCredentials] Credentials lack required scopes. Need: ${requiredScopes}, Have: ${credentialScopes}, Missing: ${missingScopes}`);
         throw new ZoomAuthenticationError(
@@ -430,7 +428,7 @@ async function getCredentials(userId, serviceType = 'zoom', requiredScopes = [])
           'INSUFFICIENT_SCOPES'
         );
       }
-      
+
       logger.debug(`[getCredentials] All required scopes present: ${requiredScopes}`);
     }
 
@@ -443,7 +441,7 @@ async function getCredentials(userId, serviceType = 'zoom', requiredScopes = [])
     // If expired and we have a refresh token, try to refresh
     if (credentials.expired && credentials.refresh_token) {
       logger.info(`[getCredentials] Credentials expired, attempting refresh for user: ${userId}, service: ${serviceType}`);
-      
+
       try {
         await credentials.refresh();
         logger.info(`[getCredentials] Successfully refreshed credentials for user: ${userId}, service: ${serviceType}`);
@@ -458,7 +456,7 @@ async function getCredentials(userId, serviceType = 'zoom', requiredScopes = [])
             refreshError
           );
         }
-        
+
         // Re-throw other refresh errors
         logger.error(`[getCredentials] Error refreshing credentials for user: ${userId}:`, refreshError);
         throw refreshError;
@@ -522,12 +520,12 @@ async function makeAuthenticatedZoomRequest(userId, endpoint, options = {}, requ
   console.log('========userId========', userId);
   try {
     logger.info(`[makeAuthenticatedZoomRequest] Making request to ${endpoint} for user: ${userId} with scopes: ${requiredScopes.length}`);
-    
+
     // Get credentials with scope validation
     const credentials = await getCredentials(userId, 'zoom', requiredScopes);
-    
+
     const url = endpoint.startsWith('http') ? endpoint : `${ZOOM_API_BASE}/${endpoint.replace(/^\//, '')}`;
-    
+
     const requestOptions = {
       ...options,
       url,
@@ -549,7 +547,7 @@ async function makeAuthenticatedZoomRequest(userId, endpoint, options = {}, requ
         logger.info(`[makeAuthenticatedZoomRequest] 401 error, attempting token refresh for user: ${userId}`);
         const credentials = await getCredentials(userId, 'zoom', requiredScopes);
         await credentials.refresh();
-        
+
         // Retry the request with refreshed token
         const url = endpoint.startsWith('http') ? endpoint : `${ZOOM_API_BASE}/${endpoint.replace(/^\//, '')}`;
         const requestOptions = {
@@ -565,7 +563,7 @@ async function makeAuthenticatedZoomRequest(userId, endpoint, options = {}, requ
 
         const retryResponse = await axios(requestOptions);
         return retryResponse.data;
-        
+
       } catch (refreshError) {
         // Handle insufficient scopes error
         if (refreshError.errorType === 'INSUFFICIENT_SCOPES') {
@@ -575,7 +573,7 @@ async function makeAuthenticatedZoomRequest(userId, endpoint, options = {}, requ
             refreshError
           );
         }
-        
+
         throw new ZoomAuthenticationError(
           'Authentication failed and could not refresh credentials. User needs to re-authenticate.',
           'REFRESH_FAILED',
@@ -583,7 +581,7 @@ async function makeAuthenticatedZoomRequest(userId, endpoint, options = {}, requ
         );
       }
     }
-    
+
     throw error;
   }
 }
@@ -619,29 +617,29 @@ async function makeEnhancedZoomRequest(userId, endpoint, options = {}, requiredS
  */
 async function handleZoomApiErrors(operation, maxRetries = 3, isReadOnly = true, userId = null, requiredScopes = []) {
   let lastError;
-  
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       return await operation();
     } catch (error) {
       lastError = error;
-      
+
       // Check if it's an authentication error
       if (error.response?.status === 401 || error instanceof ZoomAuthenticationError) {
         logger.warn(`[handleZoomApiErrors] Authentication error on attempt ${attempt}, trying to refresh credentials`);
-        
+
         if (userId) {
           try {
             // Try to refresh credentials with proper scopes
             const credentials = await getCredentials(userId, 'zoom', requiredScopes);
             await credentials.refresh();
-            
+
             // Retry the operation with refreshed credentials
             logger.info(`[handleZoomApiErrors] Credentials refreshed successfully, retrying operation`);
             continue;
           } catch (refreshError) {
             logger.error(`[handleZoomApiErrors] Failed to refresh credentials:`, refreshError.message);
-            
+
             // If refresh token is invalid or scopes are insufficient, user needs to re-authenticate
             if (refreshError.errorType === 'REFRESH_TOKEN_INVALID' || refreshError.errorType === 'INSUFFICIENT_SCOPES') {
               throw new ZoomAuthenticationError(
@@ -650,7 +648,7 @@ async function handleZoomApiErrors(operation, maxRetries = 3, isReadOnly = true,
                 refreshError
               );
             }
-            
+
             throw new ZoomAuthenticationError(
               'Authentication failed and could not refresh credentials.',
               'REFRESH_FAILED',
@@ -666,7 +664,7 @@ async function handleZoomApiErrors(operation, maxRetries = 3, isReadOnly = true,
           );
         }
       }
-      
+
       // Check if it's a retryable error
       if (attempt < maxRetries && (
         error.response?.status === 429 || // Rate limit
@@ -680,12 +678,12 @@ async function handleZoomApiErrors(operation, maxRetries = 3, isReadOnly = true,
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
-      
+
       // If not retryable or max retries reached, throw the error
       break;
     }
   }
-  
+
   throw lastError;
 }
 
@@ -879,7 +877,7 @@ async function diagnoseZoomAuthIssues(userId) {
         timeout: 5000,
         validateStatus: () => true // Don't throw on any status
       });
-      
+
       diagnosis.networkStatus = {
         zoomReachable: testResponse.status < 500,
         responseStatus: testResponse.status,
