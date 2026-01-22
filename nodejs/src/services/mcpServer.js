@@ -46,7 +46,7 @@ async function startMCPServer() {
                 condition: ["sunny", "cloudy", "rainy", "snowy"][Math.floor(Math.random() * 4)],
                 humidity: Math.floor(Math.random() * 100)
             };
-            
+
             return {
                 content: [{
                     type: "text",
@@ -98,7 +98,7 @@ async function startMCPServer() {
                     }
                 ]
             };
-            
+
             return {
                 content: [{
                     type: "text",
@@ -277,7 +277,7 @@ async function startMCPServer() {
         async ({ user_id = null, channel_name, is_private = false, purpose = '', initial_members = [] }) => {
             try {
                 const result = await slackTools.createSlackChannel(user_id, channel_name, is_private, purpose, initial_members);
-                
+
                 return {
                     content: [{
                         type: "text",
@@ -689,7 +689,7 @@ async function startMCPServer() {
         {
             description: "Send a message that can be used to start a thread. All the fields are optional.",
             inputSchema: {
-                user_id: z.string().optional().describe("User ID to get Slack access token from. If not provided, the default user will be used."), 
+                user_id: z.string().optional().describe("User ID to get Slack access token from. If not provided, the default user will be used."),
                 channel_id: z.string().describe("The ID of the channel"),
                 message: z.string().describe("Message content to start the thread with")
             }
@@ -719,7 +719,7 @@ async function startMCPServer() {
         {
             description: "Reply to a thread and broadcast the reply to the channel. All the fields are optional.",
             inputSchema: {
-                user_id: z.string().optional().describe("User ID to get Slack access token from. If not provided, the default user will be used."), 
+                user_id: z.string().optional().describe("User ID to get Slack access token from. If not provided, the default user will be used."),
                 channel_id: z.string().describe("The ID of the channel"),
                 thread_ts: z.string().describe("Timestamp of the parent message to reply to"),
                 message: z.string().describe("Reply message content")
@@ -750,7 +750,7 @@ async function startMCPServer() {
         {
             description: "Get summary information about a thread. All the fields are optional.",
             inputSchema: {
-                user_id: z.string().optional().describe("User ID to get Slack access token from. If not provided, the default user will be used."), 
+                user_id: z.string().optional().describe("User ID to get Slack access token from. If not provided, the default user will be used."),
                 channel_id: z.string().describe("The ID of the channel"),
                 thread_ts: z.string().describe("Timestamp of the parent message")
             }
@@ -780,7 +780,7 @@ async function startMCPServer() {
         {
             description: "Find all messages that have threads (replies) in a channel. All the fields are optional.",
             inputSchema: {
-                user_id: z.string().optional().describe("User ID to get Slack access token from. If not provided, the default user will be used."), 
+                user_id: z.string().optional().describe("User ID to get Slack access token from. If not provided, the default user will be used."),
                 channel_id: z.string().describe("The ID of the channel"),
                 limit: z.number().optional().describe("Maximum number of messages to check (default: 100)")
             }
@@ -1453,7 +1453,7 @@ async function startMCPServer() {
             }
         },
         async ({ user_id = null }) => {
-            
+
             try {
                 const result = await asanaTools.getWorkspaceId(user_id);
                 return {
@@ -1815,7 +1815,7 @@ async function startMCPServer() {
                 body: z.string().optional().describe("Pull request body"),
                 head: z.string().optional().describe("Branch to merge from"),
                 base: z.string().optional().describe("Branch to merge into"),
-                user_id: z.string().optional().describe("User ID to get GitHub access token from. If not provided, the default user will be used.") 
+                user_id: z.string().optional().describe("User ID to get GitHub access token from. If not provided, the default user will be used.")
             }
         },
         async ({ owner, repo, title, body, head, base, user_id = null }) => {
@@ -4124,7 +4124,7 @@ async function startMCPServer() {
                 // Extract and normalize parameters
                 const user_id = params.user_id || null;
                 const name = params.name;
-                
+
                 // Handle nodes - ensure it's an array
                 let nodes = params.nodes;
                 if (!Array.isArray(nodes)) {
@@ -4148,7 +4148,7 @@ async function startMCPServer() {
                         };
                     }
                 }
-                
+
                 const connections = params.connections || null;
                 const settings = params.settings || null;
                 const staticData = params.staticData || null;
@@ -6107,7 +6107,7 @@ async function startMCPServer() {
             }
         },
         async ({ user_id = null, calendar_id = 'primary', time_min = null, time_max = null, max_results = 20 }) => {
-            
+
             try {
                 const result = await calendarTools.getEvents(user_id, calendar_id, time_min, time_max, max_results);
                 return {
@@ -6298,18 +6298,18 @@ async function startMCPServer() {
 
     // Create Express app
     const app = express();
-    
+
     // Enable CORS
     app.use(cors());
     app.use(express.json());
-    
+
     // Set timeout for all requests to 5 minutes to match server timeout
     app.use((req, res, next) => {
         req.setTimeout(300000); // 5 minutes
         res.setTimeout(300000); // 5 minutes
         next();
     });
-    
+
     // Health check endpoint
     app.get('/mcp-health', (req, res) => {
         res.json({
@@ -6322,39 +6322,39 @@ async function startMCPServer() {
             description: 'Model Context Protocol server with SSE transport for Weam'
         });
     });
-    
+
     // Store active transports with session management
     const transports = new Map();
 
     // MCP SSE connection endpoint
     app.get('/mcp', (req, res) => {
         console.log('MCP client connected via GET');
-        
+
         // Extract user information from request (session, headers, etc.)
         const userId = req.headers['x-user-id'] || req.query.userId || 'anonymous';
         const sessionId = req.headers['x-session-id'] || req.query.sessionId || `session_${Date.now()}`;
-        
+
         console.log(`🔗 [MCP Server] New connection - User: ${userId}, Session: ${sessionId}`);
-        
+
         // Create SSE transport with POST endpoint path
         const transport = new SSEServerTransport('/mcp/messages', res);
-        
+
         // Store transport by session ID
         transports.set(transport.sessionId, transport);
-        
+
         // Register transport with session manager
         mcpSessionManager.registerTransport(transport.sessionId, userId, sessionId);
-        
+
         // Handle client disconnect with session-based cleanup
         req.on('close', () => {
             console.log('MCP client disconnected, handling via session manager for sessionId:', transport.sessionId);
-            
+
             // Use session manager to handle disconnect
             const cleanupInfo = mcpSessionManager.handleTransportDisconnect(transport.sessionId);
-            
+
             if (cleanupInfo && cleanupInfo.shouldCleanup === false) {
                 console.log(`🔄 [MCP Server] Transport cleanup managed by session manager (Grace period: ${cleanupInfo.gracePeriod / 1000}s)`);
-                
+
                 // If session manager indicates cleanup should happen later, 
                 // we'll let it handle the cleanup timing
                 if (cleanupInfo.gracePeriod > 0) {
@@ -6374,7 +6374,7 @@ async function startMCPServer() {
                 transports.delete(transport.sessionId);
             }
         });
-        
+
         // Connect server to transport
         server.connect(transport).catch(console.error);
     });
@@ -6384,32 +6384,32 @@ async function startMCPServer() {
     // MCP POST message endpoint
     app.post('/mcp/messages', async (req, res) => {
         console.log('MCP client sent message via POST');
-        
+
         try {
             const sessionId = req.query.sessionId;
             if (!sessionId || typeof sessionId !== 'string') {
                 console.log('POST request missing or invalid sessionId');
                 return res.status(400).json({ error: 'Missing or invalid sessionId' });
             }
-            
+
             // Update user activity in session manager
             const userId = mcpSessionManager.getUserFromTransport(sessionId);
             if (userId) {
                 mcpSessionManager.updateUserActivity(userId);
                 console.log(`🔄 [MCP Server] Updated activity for user ${userId} via transport ${sessionId}`);
             }
-            
+
             const transport = transports.get(sessionId);
             if (!transport) {
                 console.log(`No transport found for sessionId: ${sessionId}. Available sessions:`, Array.from(transports.keys()));
-                
-                return res.status(400).json({ 
+
+                return res.status(400).json({
                     error: 'No transport found for sessionId',
                     sessionId: sessionId,
                     availableSessions: Array.from(transports.keys())
                 });
             }
-            
+
             // Handle the POST message through the transport
             await transport.handlePostMessage(req, res, req.body);
         } catch (error) {
@@ -6421,16 +6421,16 @@ async function startMCPServer() {
     // User logout cleanup endpoint
     app.post('/cleanup-user-session', async (req, res) => {
         console.log('🧹 [MCP Server] User logout cleanup requested');
-        
+
         try {
             const { userId } = req.body;
             if (!userId) {
                 return res.status(400).json({ error: 'Missing userId' });
             }
-            
+
             // Clean up user session and associated transports
             const cleanedUp = mcpSessionManager.cleanupUserSession(userId);
-            
+
             if (cleanedUp) {
                 // Also clean up any transports associated with this user
                 const userTransports = [];
@@ -6440,24 +6440,24 @@ async function startMCPServer() {
                         userTransports.push(sessionId);
                     }
                 }
-                
+
                 // Remove transports for this user
                 userTransports.forEach(sessionId => {
                     console.log(`🧹 [MCP Server] Cleaning up transport ${sessionId} for user ${userId}`);
                     transports.delete(sessionId);
                 });
-                
+
                 console.log(`✅ [MCP Server] Successfully cleaned up session for user ${userId}, removed ${userTransports.length} transports`);
-                res.json({ 
-                    success: true, 
+                res.json({
+                    success: true,
                     message: `Cleaned up session for user ${userId}`,
                     transportsRemoved: userTransports.length
                 });
             } else {
                 console.log(`ℹ️ [MCP Server] No active session found for user ${userId}`);
-                res.json({ 
-                    success: true, 
-                    message: `No active session found for user ${userId}` 
+                res.json({
+                    success: true,
+                    message: `No active session found for user ${userId}`
                 });
             }
         } catch (error) {
@@ -6476,7 +6476,7 @@ async function startMCPServer() {
                 memoryUsage: process.memoryUsage(),
                 timestamp: new Date().toISOString()
             };
-            
+
             res.json({
                 sessionManager: sessionStats,
                 server: serverStats,
@@ -6494,12 +6494,9 @@ async function startMCPServer() {
     // Start the server
     const PORT = process.env.MCP_PORT || 3006;
     const httpServer = app.listen(PORT, () => {
-        console.log(`Weam MCP Server running on port ${PORT}`);
         console.log(`MCP SSE endpoint: ${LINK.MCP_SERVER_URL}/mcp-event`);
-        console.log(`MCP POST endpoint: ${LINK.MCP_SERVER_URL}/mcp/messages`);
-        console.log(`Health check: ${LINK.MCP_SERVER_URL}/mcp-health`);
     });
-    
+
     // Set server timeout to 5 minutes to match client timeout
     httpServer.timeout = 300000;
     httpServer.keepAliveTimeout = 305000;

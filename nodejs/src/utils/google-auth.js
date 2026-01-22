@@ -17,28 +17,26 @@ const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 // Validate configuration on module load
 function validateGoogleOAuthConfig() {
   const errors = [];
-  
+
   if (!config.GOOGLE_OAUTH?.CLIENT_ID) {
     errors.push('GOOGLE_OAUTH_CLIENT_ID is not set');
   }
-  
+
   if (!config.GOOGLE_OAUTH?.CLIENT_SECRET) {
     errors.push('GOOGLE_OAUTH_CLIENT_SECRET is not set');
   }
-  
+
   if (!config.GOOGLE_OAUTH?.REDIRECT_URI) {
     errors.push('GOOGLE_OAUTH.REDIRECT_URI is not properly configured');
   }
-  
+
   if (errors.length > 0) {
-    logger.error('[GoogleAuth] Configuration validation failed:', errors);
-    logger.error('[GoogleAuth] Current environment:', process.env.NODE_ENV);
-    logger.error('[GoogleAuth] Base URL:', process.env.BASE_URL);
+    logger.warn(`[GoogleAuth] Configuration validation failed: ${errors}`);
   } else {
     logger.info('[GoogleAuth] Configuration validation passed');
-    logger.debug('[GoogleAuth] Redirect URI:', config.GOOGLE_OAUTH.REDIRECT_URI);
+    logger.debug(`[GoogleAuth] Redirect URI: ${config.GOOGLE_OAUTH.REDIRECT_URI}`);
   }
-  
+
   return errors;
 }
 
@@ -54,12 +52,12 @@ const GOOGLE_SCOPES = {
   GMAIL_SEND: 'https://www.googleapis.com/auth/gmail.send',
   GMAIL_LABELS: 'https://www.googleapis.com/auth/gmail.labels',
   GMAIL_METADATA: 'https://www.googleapis.com/auth/gmail.metadata',
-  
+
   // Drive scopes
   DRIVE_READONLY: 'https://www.googleapis.com/auth/drive.readonly',
   DRIVE_FILE: 'https://www.googleapis.com/auth/drive.file',
   DRIVE_METADATA_READONLY: 'https://www.googleapis.com/auth/drive.metadata.readonly',
-  
+
   // Calendar scopes
   CALENDAR_READONLY: 'https://www.googleapis.com/auth/calendar.readonly',
   CALENDAR_EVENTS: 'https://www.googleapis.com/auth/calendar.events',
@@ -107,7 +105,7 @@ class GoogleCredentials {
     this.expiry = mcpData.expiry_date || mcpData.expiry;
     this.client_id = config.GOOGLE_OAUTH.CLIENT_ID;
     this.client_secret = config.GOOGLE_OAUTH.CLIENT_SECRET;
-    
+
     // Handle scopes - can be array or space-separated string (matching Python implementation)
     if (mcpData.scopes) {
       this.scopes = Array.isArray(mcpData.scopes) ? mcpData.scopes : [];
@@ -127,16 +125,16 @@ class GoogleCredentials {
     if (!this.access_token) {
       return false;
     }
-    
+
     if (!this.expiry) {
       return true; // No expiry means token is valid
     }
-    
+
     // Add 5-minute buffer for proactive refresh (matching Python behavior)
     const bufferTime = 5 * 60 * 1000; // 5 minutes in milliseconds
     const now = Date.now();
     const expiryTime = typeof this.expiry === 'number' ? this.expiry : new Date(this.expiry).getTime();
-    
+
     return now < (expiryTime - bufferTime);
   }
 
@@ -148,10 +146,10 @@ class GoogleCredentials {
     if (!this.expiry) {
       return false;
     }
-    
+
     const now = Date.now();
     const expiryTime = typeof this.expiry === 'number' ? this.expiry : new Date(this.expiry).getTime();
-    
+
     return now >= expiryTime;
   }
 
@@ -202,9 +200,9 @@ class GoogleCredentials {
 
       if (response.status !== 200) {
         const errorData = response.data || {};
-        
+
         logger.error(`[GoogleCredentials] Token refresh failed with status ${response.status}:`, errorData);
-        
+
         if (response.status === 400 && errorData.error === 'invalid_grant') {
           throw new GoogleAuthenticationError(
             'Refresh token is invalid or expired. User needs to re-authenticate.',
@@ -212,7 +210,7 @@ class GoogleCredentials {
             errorData
           );
         }
-        
+
         if (response.status === 401) {
           throw new GoogleAuthenticationError(
             'Authentication failed. Check GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET configuration.',
@@ -220,7 +218,7 @@ class GoogleCredentials {
             errorData
           );
         }
-        
+
         throw new GoogleAuthenticationError(
           `Token refresh failed: ${errorData.error_description || errorData.error || 'Unknown error'}`,
           'TOKEN_REFRESH_FAILED',
@@ -241,12 +239,12 @@ class GoogleCredentials {
 
       // Update credentials with new token
       this.access_token = access_token;
-      
+
       // Calculate new expiry time
       if (expires_in) {
         this.expiry = Date.now() + (expires_in * 1000);
       }
-      
+
       // Update refresh token if provided
       if (newRefreshToken) {
         this.refresh_token = newRefreshToken;
@@ -344,7 +342,7 @@ class GoogleCredentials {
       // Update tokens with encryption
       user.mcpdata[serviceKey].access_token = encryptedData(this.access_token);
       user.mcpdata[serviceKey].expiry_date = this.expiry;
-      
+
       if (this.refresh_token) {
         user.mcpdata[serviceKey].refresh_token = encryptedData(this.refresh_token);
       }
@@ -389,7 +387,7 @@ class GoogleCredentials {
 async function getCredentials(userId, serviceType = 'gmail', requiredScopes = []) {
   try {
     logger.info(`[getCredentials] Starting credential retrieval for user: ${userId}, service: ${serviceType}, required scopes: ${requiredScopes.length}`);
-    
+
     // Fetch user's MCP data
     const user = await User.findById(userId);
     if (!user || !user.mcpdata) {
@@ -444,7 +442,7 @@ async function getCredentials(userId, serviceType = 'gmail', requiredScopes = []
     if (requiredScopes && requiredScopes.length > 0) {
       const credentialScopes = credentials.scopes || [];
       const missingScopes = requiredScopes.filter(scope => !credentialScopes.includes(scope));
-      
+
       if (missingScopes.length > 0) {
         logger.warn(`[getCredentials] Credentials lack required scopes. Need: ${requiredScopes}, Have: ${credentialScopes}, Missing: ${missingScopes}`);
         throw new GoogleAuthenticationError(
@@ -452,7 +450,7 @@ async function getCredentials(userId, serviceType = 'gmail', requiredScopes = []
           'INSUFFICIENT_SCOPES'
         );
       }
-      
+
       logger.debug(`[getCredentials] All required scopes present: ${requiredScopes}`);
     }
 
@@ -465,7 +463,7 @@ async function getCredentials(userId, serviceType = 'gmail', requiredScopes = []
     // If expired and we have a refresh token, try to refresh
     if (credentials.expired && credentials.refresh_token) {
       logger.info(`[getCredentials] Credentials expired, attempting refresh for user: ${userId}, service: ${serviceType}`);
-      
+
       try {
         await credentials.refresh();
         logger.info(`[getCredentials] Successfully refreshed credentials for user: ${userId}, service: ${serviceType}`);
@@ -480,7 +478,7 @@ async function getCredentials(userId, serviceType = 'gmail', requiredScopes = []
             refreshError
           );
         }
-        
+
         // Re-throw other refresh errors
         logger.error(`[getCredentials] Error refreshing credentials for user: ${userId}:`, refreshError);
         throw refreshError;
@@ -516,7 +514,7 @@ async function getCredentials(userId, serviceType = 'gmail', requiredScopes = []
 async function getAuthenticatedGoogleService(userId, serviceName, version = 'v1', requiredScopes = []) {
   try {
     logger.info(`[getAuthenticatedGoogleService] Creating ${serviceName} service for user: ${userId}, version: ${version}, required scopes: ${requiredScopes.length}`);
-    
+
     // Log environment info for debugging
     logger.debug(`[getAuthenticatedGoogleService] Environment: ${process.env.NODE_ENV}, CLIENT_ID exists: ${!!config.GOOGLE_OAUTH?.CLIENT_ID}, CLIENT_SECRET exists: ${!!config.GOOGLE_OAUTH?.CLIENT_SECRET}`);
 
@@ -529,24 +527,24 @@ async function getAuthenticatedGoogleService(userId, serviceName, version = 'v1'
 
     const serviceType = serviceTypeMap[serviceName.toLowerCase()] || serviceName;
     logger.debug(`[getAuthenticatedGoogleService] Service type mapped to: ${serviceType}, passing ${requiredScopes.length} required scopes`);
-    
+
     // CRITICAL FIX: Pass requiredScopes to getCredentials (matching Python implementation)
     // This ensures credentials have all necessary permissions before creating the service
     const credentials = await getCredentials(userId, serviceType, requiredScopes);
     logger.debug(`[getAuthenticatedGoogleService] Credentials retrieved and validated successfully`);
-    
+
     // Create OAuth2 client
     const oauth2Client = new google.auth.OAuth2(config.GOOGLE_OAUTH.CLIENT_ID, config.GOOGLE_OAUTH.CLIENT_SECRET);
     const oauth2Creds = credentials.toOAuth2Credentials();
-    
+
     logger.debug(`[getAuthenticatedGoogleService] OAuth2 credentials prepared - access_token exists: ${!!oauth2Creds.access_token}, refresh_token exists: ${!!oauth2Creds.refresh_token}`);
-    
+
     oauth2Client.setCredentials(oauth2Creds);
-    
+
     // Create and return the Google service with proper service name mapping
     let service;
     const lowerServiceName = serviceName.toLowerCase();
-    
+
     switch (lowerServiceName) {
       case 'gmail':
         service = google.gmail({ version, auth: oauth2Client });
@@ -566,7 +564,7 @@ async function getAuthenticatedGoogleService(userId, serviceName, version = 'v1'
           throw new Error(`Unsupported Google service: ${serviceName}`);
         }
     }
-    
+
     logger.info(`[getAuthenticatedGoogleService] Successfully created ${serviceName} service for user: ${userId} with validated scopes`);
     return service;
 
@@ -614,29 +612,29 @@ async function getAuthenticatedCalendarService(userId, scopeGroup = 'calendar_re
  */
 async function handleGoogleApiErrors(operation, maxRetries = 3, isReadOnly = true, userId = null, serviceType = 'gmail', requiredScopes = []) {
   let lastError;
-  
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       return await operation();
     } catch (error) {
       lastError = error;
-      
+
       // Check if it's an authentication error
       if (error.code === 401 || error.message?.includes('invalid_grant') || error.message?.includes('invalid_token')) {
         logger.warn(`[handleGoogleApiErrors] Authentication error on attempt ${attempt}, trying to refresh credentials`);
-        
+
         if (userId && serviceType) {
           try {
             // Try to refresh credentials with proper service type and scopes
             const credentials = await getCredentials(userId, serviceType, requiredScopes);
             await credentials.refresh();
-            
+
             // Retry the operation with refreshed credentials
             logger.info(`[handleGoogleApiErrors] Credentials refreshed successfully, retrying operation`);
             continue;
           } catch (refreshError) {
             logger.error(`[handleGoogleApiErrors] Failed to refresh credentials:`, refreshError.message);
-            
+
             // If refresh token is invalid, user needs to re-authenticate
             if (refreshError.errorType === 'REFRESH_TOKEN_INVALID' || refreshError.errorType === 'INSUFFICIENT_SCOPES') {
               throw new GoogleAuthenticationError(
@@ -645,7 +643,7 @@ async function handleGoogleApiErrors(operation, maxRetries = 3, isReadOnly = tru
                 refreshError
               );
             }
-            
+
             throw new GoogleAuthenticationError(
               'Authentication failed and could not refresh credentials.',
               'REFRESH_FAILED',
@@ -661,7 +659,7 @@ async function handleGoogleApiErrors(operation, maxRetries = 3, isReadOnly = tru
           );
         }
       }
-      
+
       // Check if it's a retryable error
       if (attempt < maxRetries && (
         error.code === 429 || // Rate limit
@@ -675,12 +673,12 @@ async function handleGoogleApiErrors(operation, maxRetries = 3, isReadOnly = tru
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
-      
+
       // If not retryable or max retries reached, throw the error
       break;
     }
   }
-  
+
   throw lastError;
 }
 
@@ -695,28 +693,28 @@ async function extractOfficeXmlText(buffer) {
     if (!buffer || !Buffer.isBuffer(buffer)) {
       throw new Error('Invalid buffer provided - expected Buffer object');
     }
-    
+
     if (buffer.length === 0) {
       throw new Error('Empty buffer provided');
     }
-    
+
     logger.info(`[extractOfficeXmlText] Processing buffer of size: ${buffer.length} bytes`);
-    
+
     const JSZip = require('jszip');
     let zip;
-    
+
     try {
       zip = await JSZip.loadAsync(buffer);
     } catch (zipError) {
       throw new Error(`Failed to load ZIP archive: ${zipError.message}. This may not be a valid Office document.`);
     }
-    
+
     const fileNames = Object.keys(zip.files);
     logger.info(`[extractOfficeXmlText] ZIP contains ${fileNames.length} files: ${fileNames.slice(0, 10).join(', ')}${fileNames.length > 10 ? '...' : ''}`);
-    
+
     let extractedText = '';
     let documentType = 'unknown';
-    
+
     // Check if it's a Word document (DOCX)
     if (zip.files['word/document.xml']) {
       documentType = 'DOCX';
@@ -756,7 +754,7 @@ async function extractOfficeXmlText(buffer) {
         const slideFiles = Object.keys(zip.files).filter(name => name.startsWith('ppt/slides/slide') && name.endsWith('.xml'));
         logger.info(`[extractOfficeXmlText] Found ${slideFiles.length} slides to process`);
         const slideTexts = [];
-        
+
         for (const slideFile of slideFiles) {
           try {
             const slideXml = await zip.files[slideFile].async('text');
@@ -779,7 +777,7 @@ async function extractOfficeXmlText(buffer) {
       const hasWordStructure = fileNames.some(name => name.startsWith('word/'));
       const hasExcelStructure = fileNames.some(name => name.startsWith('xl/'));
       const hasPowerPointStructure = fileNames.some(name => name.startsWith('ppt/'));
-      
+
       if (hasWordStructure) {
         throw new Error('Detected Word document structure but missing word/document.xml file');
       } else if (hasExcelStructure) {
@@ -790,15 +788,15 @@ async function extractOfficeXmlText(buffer) {
         throw new Error(`Unrecognized Office document format. Available files: ${fileNames.slice(0, 5).join(', ')}`);
       }
     }
-    
+
     if (!extractedText || extractedText.trim().length === 0) {
       logger.warn(`[extractOfficeXmlText] No text content extracted from ${documentType} document`);
       return `[No text content found in ${documentType} document]`;
     }
-    
+
     logger.info(`[extractOfficeXmlText] Successfully extracted ${extractedText.length} characters from ${documentType} document`);
     return extractedText;
-    
+
   } catch (error) {
     logger.error('[extractOfficeXmlText] Error extracting text from Office document:', {
       message: error.message,
@@ -920,7 +918,7 @@ async function diagnoseGoogleAuthIssues(userId, serviceType = 'gmail') {
         timeout: 5000,
         validateStatus: () => true // Don't throw on any status
       });
-      
+
       diagnosis.networkStatus = {
         googleApisReachable: testResponse.status < 500,
         responseStatus: testResponse.status,

@@ -21,6 +21,12 @@ export const ChatWebSearchLoader = () => {
     )
 }
 
+export const ChatImageGenerationLoader = () => {
+    return (
+        <div className="text-font-18 animate-pulse text-b5">Generating image...</div>
+    )
+}
+
 export const ChatResponseInitRequestLoader = () => {
     return (
         <div className="text-font-18 animate-pulse text-b5">Give me a moment working on it...</div>
