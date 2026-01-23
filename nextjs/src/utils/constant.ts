@@ -60,7 +60,8 @@ export const MODULES = {
     TAB_AGENT_LIST: 'tabAgentList',
     TAB_DOCUMENT_LIST: 'tabDocumentList',
     CONFIGURATION_ENV: 'configurationEnv',
-    IMPORT_CHAT: 'import-chat'
+    IMPORT_CHAT: 'import-chat',
+    WORKFLOW: 'workflow'
 } as const;
 
 export const MODULE_ACTIONS = {
@@ -239,6 +240,7 @@ export const SEARCH_AND_FILTER_OPTIONS = {
     NORMAL_SLUG: 'slug',
     FIRST_NAME: 'fname',
     LAST_NAME: 'lname',
+    NORMAL_NAME: 'name',
 }
 
 export const IGNORE_API_DATAKEY = {
@@ -452,9 +454,9 @@ export const AI_MODAL_NAME = {
     GPT_5: 'gpt-5',
     // GPT_5_MINI: 'gpt-5-mini',
     // GPT_5_NANO: 'gpt-5-nano',
-    GPT_5_CHAT: 'gpt-5-chat-latest',    
-    GPT_5_1:'gpt-5.1',   
-    GPT_5_2:'gpt-5.2',
+    GPT_5_CHAT: 'gpt-5-chat-latest',
+    GPT_5_1: 'gpt-5.1',
+    GPT_5_2: 'gpt-5.2',
     // Open AI models
     // GPT_4_1: 'gpt-4.1',
     // GPT_4_O_LATEST: 'chatgpt-4o-latest',
@@ -495,7 +497,7 @@ export const AI_MODAL_NAME = {
     // Llama models
     LLAMA_4_MAVERICK: 'meta-llama/llama-4-maverick',
     LLAMA_4_SCOUT: 'meta-llama/llama-4-scout',
-    
+
     // Grok models
     GROK_3_MINI_BETA: 'x-ai/grok-3-mini-beta',
 
@@ -505,13 +507,13 @@ export const AI_MODAL_NAME = {
     OLLAMA_LLAMA_3_2_1B: 'llama3.2:1b',
 
     // Qwen models
-    QWEN_3_30B_A3B: 'qwen/qwen3-30b-a3b:free',    
+    QWEN_3_30B_A3B: 'qwen/qwen3-30b-a3b:free',
 }
 
 export const USER_STATUS = {
-    PENDING : 'PENDING',
-    ACCEPT : 'ACCEPT',
-    EXPIRED : 'EXPIRED',
+    PENDING: 'PENDING',
+    ACCEPT: 'ACCEPT',
+    EXPIRED: 'EXPIRED',
 };
 
 export const STORAGE_REQUEST_STATUS = {
@@ -533,7 +535,7 @@ export const RESPONSE_STATUS = {
 
 export const RESPONSE_STATUS_CODE = {
     TOKEN_NOT_FOUND: 'TOKEN_NOT_FOUND',
-    UNAUTHORIZED:'UNAUTHORIZED',
+    UNAUTHORIZED: 'UNAUTHORIZED',
     REFRESH_TOKEN: 'REFRESH_TOKEN',
     ERROR: 'ERROR',
     SUCCESS: 'SUCCESS',
@@ -550,7 +552,7 @@ export const SUBSCRIPTION_STATUS = {
     ACTIVE: 'ACTIVE',
     EXPIRED: 'EXPIRED',
     PENDING_CANCELLATION: 'PENDING_CANCELLATION',
-    CANCELED: 'CANCELED'   
+    CANCELED: 'CANCELED'
 }
 
 // export const RAZORPAY_SUBSCRIPTION_STATUS = {
@@ -567,11 +569,11 @@ export const APPLICATION_ENVIRONMENT = {
 }
 
 export const PROD_COMPANYID = [
-    
+
 ];
 
-export const DEFAULT_CHAT_SLUG="default-brain-"
-  
+export const DEFAULT_CHAT_SLUG = "default-brain-"
+
 export const CURRENCY = {
     INR: 'inr',
     USD: 'usd'
@@ -1178,7 +1180,7 @@ export const CUSTOM_DOMAIN_BLOCK_LIST = [
     'rodgers1848@aigorithm.space'
 ] as const;
 
-export const SUB_MODEL_TYPE = [ 
+export const SUB_MODEL_TYPE = [
     'OPEN_AI',
     'HUGGING_FACE',
     'ANTHROPIC',
@@ -1523,8 +1525,8 @@ export const DEFAULT_BRAIN_TITLE = "Default Brain";
 export const GENERAL_BRAIN_SLUG = 'general-brain';
 
 export const VALID_PLATFORMS = {
-   "OPENAI":'Open AI',
-   "ANTHROPIC":'Anthropic'
+    "OPENAI": 'Open AI',
+    "ANTHROPIC": 'Anthropic'
 }
 
 
@@ -1550,7 +1552,7 @@ export const FEATURES_WEAM = [
     {
         title: 'Refine',
         description:
-        'Modify specific parts of generated content using prompts.',
+            'Modify specific parts of generated content using prompts.',
     },
     {
         title: 'Unlimited Prompts',
@@ -1591,7 +1593,7 @@ export const MODEL_NAME_BY_CODE = {
     'gpt-5-chat-latest': 'OPEN_AI',
     'gpt-5.1': 'OPEN_AI',
     'gpt-5.2': 'OPEN_AI',
-    
+
     // Gemini models
     'gemini-2.5-pro-preview-05-06': 'GEMINI',
     'gemini-2.0-flash': 'GEMINI',
@@ -1603,7 +1605,7 @@ export const MODEL_NAME_BY_CODE = {
     'gemini-2.5-pro': 'GEMINI',
     'gemini-2.5-flash': 'GEMINI',
     'gemini-3-pro-preview': 'GEMINI',
-    
+
     // Anthropic models
     'claude-3-opus-latest': 'ANTHROPIC',
     'claude-3-5-sonnet-latest': 'ANTHROPIC',
@@ -1617,13 +1619,13 @@ export const MODEL_NAME_BY_CODE = {
     'claude-opus-4-1-20250805': 'ANTHROPIC',
     'claude-opus-4-5-20251101': 'ANTHROPIC',
     'claude-haiku-4-5-20251001': 'ANTHROPIC',
-    
+
     // Perplexity models
     'llama-3.1-sonar-large-128k-online': 'PERPLEXITY',
     'sonar': 'PERPLEXITY',
     'sonar-pro': 'PERPLEXITY',
     'sonar-reasoning-pro': 'PERPLEXITY',
-    
+
     // DeepSeek models
     'deepseek-r1': 'DEEPSEEK',
     'deepseek-r1-distill-llama-70b': 'DEEPSEEK',
@@ -1631,20 +1633,20 @@ export const MODEL_NAME_BY_CODE = {
     'deepseek/deepseek-r1-distill-llama-70b': 'DEEPSEEK',
     'deepseek/deepseek-r1-distill-qwen-32b': 'DEEPSEEK',
     'deepseek/deepseek-r1': 'DEEPSEEK',
-    
+
     // Llama models
     'llama-4-scout': 'LLAMA4',
     'llama-4-maverick': 'LLAMA4',
     'meta-llama/llama-4-scout': 'LLAMA4',
     'meta-llama/llama-4-maverick': 'LLAMA4',
     'llama-3-2-3b-instruct-ctq': 'LLAMA',
-    
+
     // Grok models
     'x-ai/grok-3-mini-beta': 'GROK',
-    
+
     // Qwen models
     'qwen/qwen3-30b-a3b:free': 'QWEN',
-    
+
     // Stability AI models
     'sdxl-flash-lgh': 'HUGGING_FACE',
 
@@ -1657,7 +1659,7 @@ export const getModelImageByName = (name: string) => {
     // Check if it's an Ollama model (local model)
     if (name) {
         // For models that are run locally through Ollama
-        if (name.includes('(Local)') || 
+        if (name.includes('(Local)') ||
             (name.toLowerCase().includes('llama') && !name.toLowerCase().includes('meta')) ||
             name.toLowerCase().includes('mistral') ||
             name.toLowerCase().includes('phi') ||
@@ -1665,7 +1667,7 @@ export const getModelImageByName = (name: string) => {
             return MODEL_IMAGE_BY_CODE['OLLAMA'];
         }
     }
-    
+
     const code = MODEL_NAME_BY_CODE[name];
     if (code) {
         return MODEL_IMAGE_BY_CODE[code];
@@ -1686,7 +1688,7 @@ export const FILE_UPLOAD_FOLDER = {
 } as const;
 
 export const WEEKLY_REPORT_CAN_ACCESS = [
-    
+
 ]
 
 export const WEB_RESOURCES_DATA = 'web_resources_data';

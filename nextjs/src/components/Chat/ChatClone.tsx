@@ -87,18 +87,17 @@ import SeoProAgentResponse from '@/components/ProAgentAnswer/SeoProAgentResponse
 import routes from '@/utils/routes';
 import useChatMember from '@/hooks/chat/useChatMember';
 import { useThunderBoltPopup } from '@/hooks/conversation/useThunderBoltPopup';
-import ChatInputFileLoader, { ChatWebSearchLoader } from '@/components/Loader/ChatInputFileLoader';
+import ChatInputFileLoader, { ChatWebSearchLoader, ChatImageGenerationLoader } from '@/components/Loader/ChatInputFileLoader';
 import useMCP from '@/hooks/mcp/useMCP';
 import ToolsConnected from './ToolsConnected';
 import SearchIcon from '@/icons/Search';
 import ThreeDotLoader from '../Loader/ThreeDotLoader';
 import { useResponseUpdate } from '@/hooks/chat/useResponseUpdate';
 import { usePageOperations } from '@/hooks/chat/usePageOperations';
-
-
 import Plus from '@/icons/Plus';
 import BookMarkIcon from '@/icons/Bookmark';
-
+import useWorkflow from '@/hooks/workflow/useWorkflow';
+import { WorkflowType } from '@/types/brain';
 
 const defaultContext: SelectedContextType = {
     type: null,
@@ -132,6 +131,7 @@ const ChatPage = memo(() => {
     const [showAgentList, setShowAgentList] = useState(false);
     const [showPromptList, setShowPromptList] = useState(false);
     const [searchValue, setSearchValue] = useState('');
+    const [showWorkflowList, setShowWorkflowList] = useState(false);
     const [showPlusMenu, setShowPlusMenu] = useState(false);
     const [showBookmarkDialog, setShowBookmarkDialog] = useState(false);
     const [isEnhanceLoading, setIsEnhanceLoading] = useState(false);
@@ -230,10 +230,22 @@ const ChatPage = memo(() => {
         onQueryTyping();
         setShowAgentList(value.startsWith('@'));
         setShowPromptList(value.startsWith('/'));
+        setShowWorkflowList(value.startsWith('#'));
     };
 
     const handleInputChanges = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchValue(e.target.value);
+    };
+
+    const handleWorkflowSelection = (workflow: WorkflowType) => {
+        // When workflow is selected, what do we do?
+        // Add it to text? #WorkflowName ?
+        // Or execute it?
+        // Usually tagging implies reference.
+        // Maybe replace '#...' with '#workflowId' or just name?
+        // For now, let's append name.
+        setText(`#${workflow.name} `);
+        setShowWorkflowList(false);
     };
 
     const handleAgentSelection = (gpt: BrainAgentType) => {
@@ -325,6 +337,30 @@ const ChatPage = memo(() => {
         paginator: agentPaginator,
         setCustomGptList
     } = useCustomGpt();
+
+    // Workflow list (placed here to access getDecodedObjectId)
+    let { getList: getTabWorkflowList, workflowList: workflows, loading: workflowLoader, setWorkflowList, saveToN8n } = useWorkflow(queryParams.get('b'));
+
+    // Workflow save/update handler - directly saves n8n workflow JSON to n8n
+    const handleSaveWorkflow = useCallback(async (
+        code: string, 
+        language: string, 
+        isUpdate: boolean = false,
+        workflowInfo?: { name?: string; id?: string } | null
+    ) => {
+        const brainId = getDecodedObjectId();
+        if (!brainId) {
+            Toast('Please select a brain to save the workflow', 'error');
+            return;
+        }
+
+        try {
+            await saveToN8n(code, brainId, isUpdate);
+        } catch (error) {
+            console.error('Failed to save workflow:', error);
+        }
+    }, [saveToN8n, getDecodedObjectId]);
+
     const [debouncedSearchValue] = useDebounce(searchValue, 500);
 
     useEffect(() => {
@@ -333,11 +369,15 @@ const ChatPage = memo(() => {
             getTabAgentList(debouncedSearchValue);
             setPromptList([]);
             getTabPromptList(debouncedSearchValue);
+            setWorkflowList([]);
+            getTabWorkflowList(debouncedSearchValue);
         } else {
             setCustomGptList([]);
             getTabAgentList('');
             setPromptList([]);
             getTabPromptList('');
+            setWorkflowList([]);
+            getTabWorkflowList('');
         }
     }, [debouncedSearchValue]);
 
@@ -1541,7 +1581,8 @@ const ChatPage = memo(() => {
                                                     }
                                                     <div className="flex-col gap-1 md:gap-3">
                                                         <div className="flex flex-grow flex-col max-w-full">
-                                                            {toolCallLoading.webSearch && <ChatWebSearchLoader/>}
+                                                            {toolCallLoading.webSearch && <ChatWebSearchLoader />}
+                                                            {toolCallLoading.imageGeneration && <ChatImageGenerationLoader />}
                                                             {
                                                                 (m?.proAgentData?.code === ProAgentCode.SEO_OPTIMISED_ARTICLES && (m.response === '' && answerMessage === '')) ?
                                                                     <SeoProAgentResponse conversation={conversations} proAgentData={m?.proAgentData} leftList={leftList} rightList={rightList} setLeftList={setLeftList} setRightList={setRightList} isLoading={isLoading} socket={socket} generateSeoArticle={generateSeoArticle} loading={loading} />
@@ -1560,6 +1601,7 @@ const ChatPage = memo(() => {
                                                                         }}
                                                                         onOpenEditModal={handleOpenEditModal}
                                                                         setConversations={setConversations}
+                                                                        onSaveWorkflow={handleSaveWorkflow}
                                                                     />
                                                             }
                                                         </div>
@@ -1612,172 +1654,229 @@ const ChatPage = memo(() => {
                                     />
                                 )}
                                 {fileLoader && (<ChatInputFileLoader/>)}
-                                {(showAgentList || showPromptList) && (
+                                {(showAgentList || showPromptList || showWorkflowList) && (
                                     <div ref={agentPromptDropdownRef}>
-                                    {showAgentList && (
-                                        <div className='w-full px-5 pt-5 pb-3 rounded-md mb-1'>
-                                            <div className='normal-agent'>
-                                                <div className='flex mb-3'>
-                                                    <div className="relative w-full">
-                                                        <input
-                                                            type="text"
-                                                            className="text-font-14 pl-[36px] py-2 w-full focus:outline-none focus:border-none"
-                                                            id="searchBots"
-                                                            placeholder="Search Agents"
-                                                            onChange={handleInputChanges}
-                                                            value={searchValue}
-                                                        />
-                                                        <span className="inline-block absolute left-[12px] top-1/2 -translate-y-1/2">
-                                                            <SearchIcon className="w-3 h-auto fill-b6" />
-                                                        </span>
+                                        {/* Show Agent List if first char is '@' */}
+                                        {showAgentList && (
+                                            <div className='w-full px-5 pt-5 pb-3 rounded-md mb-1'>
+                                                <div className='normal-agent'>
+                                                    <div className='flex mb-3'>
+                                                        <div className="relative w-full">
+                                                            <input
+                                                                type="text"
+                                                                className="text-font-14 pl-[36px] py-2 w-full focus:outline-none focus:border-none"
+                                                                id="searchBots"
+                                                                placeholder="Search Agents"
+                                                                onChange={handleInputChanges}
+                                                                value={searchValue}
+                                                            />
+                                                            <span className="inline-block absolute left-[12px] top-1/2 -translate-y-1/2">
+                                                                <SearchIcon className="w-3 h-auto fill-b6" />
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="pr-1 h-full overflow-y-auto max-md:overflow-x-hidden w-full max-h-[250px]">
+                                                        {
+                                                            customgptList.length > 0 && (
+                                                            customgptList.map((gpt: BrainAgentType, index: number, gptArray: BrainAgentType[]) => {
+                                                                const isSelected = globalUploadedFile?.some((file: UploadedFileType) => file?._id === gpt._id);
+                                                                
+                                                                return (
+                                                                    <div
+                                                                        key={gpt._id}
+                                                                        className={`cursor-pointer border-b10 py-1.5 px-2.5 transition-all ease-in-out rounded-md hover:bg-b12 ${    
+                                                                            isSelected
+                                                                                ? 'bg-b12 border-b10'
+                                                                                : 'bg-white border-b10'
+                                                                        } flex-wrap`}
+                                                                        onClick={() => handleAgentSelection(gpt)}
+                                                                    >
+                                                                        
+                                                                        <div className="flex items-center flex-wrap xl:flex-nowrap">
+                                                                                                                                                        <Image
+                                                                                    src={
+                                                                                        gpt?.coverImg?.uri
+                                                                                            ? `${LINK.AWS_S3_URL}${gpt.coverImg.uri}`
+                                                                                            : gpt?.charimg
+                                                                                            ? gpt.charimg
+                                                                                            : defaultCustomGptImage.src
+                                                                                    }
+                                                                                    height={60}
+                                                                                    width={60}
+                                                                                    className="w-6 h-6 object-contain rounded-custom inline-block"
+                                                                                    alt={
+                                                                                        gpt?.coverImg
+                                                                                            ?.name ||
+                                                                                        gpt?.charimg
+                                                                                            ? 'Character Image'
+                                                                                            : 'Default Image'
+                                                                                    }
+                                                                                />
+                                                                            <p className="text-font-12 font-medium text-b2 mx-2">
+                                                                                {gpt.title}
+                                                                            </p>
+                                                                            {/* <span className='text-font-12 ml-2 px-2 py-[2px] bg-b13 border rounded-full'>
+                                                                                {getDisplayModelName(gpt.responseModel.name)}
+                                                                            </span>
+                                                                            <div className='ml-1 text-b6 text-font-12 max-md:w-full'>
+                                                                                - {gpt.isShare ? 'Shared' : 'Private'} / {gpt.brain.title}
+                                                                            </div> */}
+                                                                            <p className='text-font-12 font-normal text-b6 mt-1'>
+                                                                                {/* {truncateText(gpt.systemPrompt,190)}                                                 */}
+                                                                                {getTruncatedSystemPrompt(gpt.title, gpt.systemPrompt, 100)}
+                                                                            </p>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })
+                                                            )
+                                                        }
+                                                        {
+                                                            customgptLoading && (
+                                                                <ThreeDotLoader className="justify-start ml-8 mt-3" />
+                                                            )
+                                                        }
                                                     </div>
                                                 </div>
-                                                <div className="pr-1 h-full overflow-y-auto max-md:overflow-x-hidden w-full max-h-[250px]">
-                                                    {
-                                                        customgptList.length > 0 && (
-                                                        customgptList.map((gpt: BrainAgentType, index: number, gptArray: BrainAgentType[]) => {
-                                                            const isSelected = globalUploadedFile?.some((file: UploadedFileType) => file?._id === gpt._id);
-                                                            
-                                                            return (
+                                            </div>
+                                        )}
+
+                                        {/* Show Prompt List if first char is '/' */}
+                                        {showPromptList && (
+                                            <div className='w-full px-5 pt-5 pb-3 rounded-md mb-1'>
+                                                <div className='prompt-list'>
+                                                    <div className='flex mb-1'>
+                                                        <div className="relative w-full">
+                                                            <input
+                                                                type="text"
+                                                                className="text-font-14 pl-[36px] py-2 w-full focus:outline-none focus:border-none"
+                                                                id="searchPrompts"
+                                                                placeholder="Search Prompts"
+                                                                onChange={handleInputChanges}
+                                                                value={searchValue}
+                                                            />
+                                                            <span className="inline-block absolute left-[12px] top-1/2 -translate-y-1/2">
+                                                                <SearchIcon className="w-3 h-auto fill-b6" />
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="pr-1 h-full overflow-y-auto max-md:overflow-x-hidden w-full max-h-[250px]">
+                                                        {
+                                                            handlePrompts?.length > 0 && (
+                                                            handlePrompts?.map((currPrompt: BrainPromptType, index: number, promptArray: BrainPromptType[]) => (
                                                                 <div
-                                                                    key={gpt._id}
-                                                                    className={`cursor-pointer border-b10 py-1.5 px-2.5 transition-all ease-in-out rounded-md hover:bg-b12 ${    
-                                                                        isSelected
+                                                                    key={currPrompt._id}
+                                                                    className={`cursor-pointer border-b10 py-1.5 px-2.5 transition-all ease-in-out rounded-md hover:bg-b12 ${
+                                                                        currPrompt.isActive
                                                                             ? 'bg-b12 border-b10'
                                                                             : 'bg-white border-b10'
-                                                                    } flex-wrap`}
-                                                                    onClick={() => handleAgentSelection(gpt)}
+                                                                    }`}
+                                                                    onClick={() => {
+                                                                        const summaries = currPrompt?.summaries
+                                                                            ? Object.values(currPrompt.summaries)
+                                                                                .map((currSummary: any) => `${currSummary.website} : ${currSummary.summary}`)
+                                                                                .join('\n')
+                                                                            : '';
+                                                                        const promptContent = currPrompt.content + (summaries ? '\n' + summaries : '');
+                                                                        onSelectMenu(GPTTypes.Prompts, currPrompt);
+                                                                        setMessage(promptContent);
+                                                                        setShowPromptList(false);
+                                                                    }}
                                                                 >
-                                                                    
                                                                     <div className="flex items-center flex-wrap xl:flex-nowrap">
-                                                                                                                                                    <Image
-                                                                                src={
-                                                                                    gpt?.coverImg?.uri
-                                                                                        ? `${LINK.AWS_S3_URL}${gpt.coverImg.uri}`
-                                                                                        : gpt?.charimg
-                                                                                        ? gpt.charimg
-                                                                                        : defaultCustomGptImage.src
-                                                                                }
-                                                                                height={60}
-                                                                                width={60}
-                                                                                className="w-6 h-6 object-contain rounded-custom inline-block"
-                                                                                alt={
-                                                                                    gpt?.coverImg
-                                                                                        ?.name ||
-                                                                                    gpt?.charimg
-                                                                                        ? 'Character Image'
-                                                                                        : 'Default Image'
-                                                                                }
-                                                                            />
-                                                                        <p className="text-font-12 font-medium text-b2 mx-2">
-                                                                            {gpt.title}
-                                                                        </p>
-                                                                        {/* <span className='text-font-12 ml-2 px-2 py-[2px] bg-b13 border rounded-full'>
-                                                                            {getDisplayModelName(gpt.responseModel.name)}
-                                                                        </span>
-                                                                        <div className='ml-1 text-b6 text-font-12 max-md:w-full'>
-                                                                            - {gpt.isShare ? 'Shared' : 'Private'} / {gpt.brain.title}
-                                                                        </div> */}
+                                                                        <p className="text-font-12 font-medium text-b2 mr-2">
+                                                                            {currPrompt.title}
+                                                                        </p>                                          
                                                                         <p className='text-font-12 font-normal text-b6 mt-1'>
-                                                                            {/* {truncateText(gpt.systemPrompt,190)}                                                 */}
-                                                                            {getTruncatedSystemPrompt(gpt.title, gpt.systemPrompt, 100)}
+                                                                            {getTruncatedSystemPrompt(currPrompt.title, currPrompt.content, 100)}
                                                                         </p>
                                                                     </div>
-                                                                </div>
-                                                            );
-                                                        })
-                                                        )
-                                                    }
-                                                    {
-                                                        customgptLoading && (
-                                                            <ThreeDotLoader className="justify-start ml-8 mt-3" />
-                                                        )
-                                                    }
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                    {/* Show Prompt List if first char is '/' */}
-                                    {showPromptList && (
-                                        <div className='w-full px-5 pt-5 pb-3 rounded-md mb-1'>
-                                            <div className='prompt-list'>
-                                                <div className='flex mb-1'>
-                                                    <div className="relative w-full">
-                                                        <input
-                                                            type="text"
-                                                            className="text-font-14 pl-[36px] py-2 w-full focus:outline-none focus:border-none"
-                                                            id="searchPrompts"
-                                                            placeholder="Search Prompts"
-                                                            onChange={handleInputChanges}
-                                                            value={searchValue}
-                                                        />
-                                                        <span className="inline-block absolute left-[12px] top-1/2 -translate-y-1/2">
-                                                            <SearchIcon className="w-3 h-auto fill-b6" />
-                                                        </span>
+
+                                                                    </div>
+                                                                        ))
+                                                                        )
+                                                                }
+                                                                {
+                                                                    loading && (
+                                                                        <ThreeDotLoader className="justify-start ml-8 mt-3" />
+                                                                    )
+                                                                }
                                                     </div>
                                                 </div>
-                                                <div className="pr-1 h-full overflow-y-auto max-md:overflow-x-hidden w-full max-h-[250px]">
-                                                    {
-                                                        handlePrompts?.length > 0 && (
-                                                        handlePrompts?.map((currPrompt: BrainPromptType, index: number, promptArray: BrainPromptType[]) => (
-                                                            <div
-                                                                key={currPrompt._id}
-                                                                className={`cursor-pointer border-b10 py-1.5 px-2.5 transition-all ease-in-out rounded-md hover:bg-b12 ${
-                                                                    currPrompt.isActive
-                                                                        ? 'bg-b12 border-b10'
-                                                                        : 'bg-white border-b10'
-                                                                }`}
-                                                                onClick={() => {
-                                                                    const summaries = currPrompt?.summaries
-                                                                        ? Object.values(currPrompt.summaries)
-                                                                            .map((currSummary: any) => `${currSummary.website} : ${currSummary.summary}`)
-                                                                            .join('\n')
-                                                                        : '';
-                                                                    const promptContent = currPrompt.content + (summaries ? '\n' + summaries : '');
-                                                                    onSelectMenu(GPTTypes.Prompts, currPrompt);
-                                                                    setMessage(promptContent);
-                                                                    setShowPromptList(false);
-                                                                }}
-                                                            >
-                                                                <div className="flex items-center flex-wrap xl:flex-nowrap">
-                                                                    <p className="text-font-12 font-medium text-b2 mr-2">
-                                                                        {currPrompt.title}
-                                                                    </p>
-                                                                    {/* <span className='text-b6 ml-1 text-font-12 max-md:w-full'>
-                                                                        - {currPrompt.isShare ? 'Shared' : 'Private'} / {currPrompt.brain.title}
-                                                                    </span>                                                 */}
-                                                                    <p className='text-font-12 font-normal text-b6 mt-1'>
-                                                                        {getTruncatedSystemPrompt(currPrompt.title, currPrompt.content, 100)}
-                                                                    </p>
+                                            </div>
+                                        )}
+
+                                        {/* Workflow Suggestion List */}
+                                        {showWorkflowList && (
+                                            <div className='w-full px-5 pt-5 pb-3 rounded-md mb-1'>
+                                                <div className='prompt-list'>
+                                                    <div className='flex mb-1'>
+                                                        <div className="relative w-full">
+                                                            <input
+                                                                type="text"
+                                                                className="text-font-14 pl-[36px] py-2 w-full focus:outline-none focus:border-none"
+                                                                placeholder="Search Workflows"
+                                                                onChange={handleInputChanges}
+                                                                value={searchValue}
+                                                            />
+                                                            <span className="inline-block absolute left-[12px] top-1/2 -translate-y-1/2">
+                                                                <SearchIcon className="w-3 h-auto fill-b6" />
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="pr-1 h-full overflow-y-auto max-md:overflow-x-hidden w-full max-h-[250px]">
+                                                        {workflows?.length > 0 ? (
+                                                            workflows.map((workflow: WorkflowType) => (
+                                                                <div
+                                                                    key={workflow._id}
+                                                                    className={`cursor-pointer border-b10 py-1.5 px-2.5 transition-all ease-in-out rounded-md hover:bg-b12 ${workflow.isActive
+                                                                            ? 'bg-b12 border-b10'
+                                                                            : 'bg-white border-b10'
+                                                                        }`}
+                                                                    onClick={() => handleWorkflowSelection(workflow)}
+                                                                >
+                                                                    <div className="flex items-center flex-wrap xl:flex-nowrap">
+                                                                        <p className="text-font-12 font-medium text-b2 mr-2">
+                                                                            {workflow.name}
+                                                                        </p>
+
+                                                                    </div>
+                                                                    {workflow.description && (
+                                                                        <p className="text-font-12 font-normal text-b6 mt-1">
+                                                                            {workflow.description}
+                                                                        </p>
+                                                                    )}
                                                                 </div>
-                                                                
+                                                            ))
+                                                        ) : (
+                                                            <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                                                                {workflowLoader ? (
+                                                                    <ThreeDotLoader className="justify-center" />
+                                                                ) : (
+                                                                    'No workflows found'
+                                                                )}
                                                             </div>
-                                                        ))
-                                                        )
-                                                    }
-                                                    {
-                                                        loading && (
-                                                            <ThreeDotLoader className="justify-start ml-8 mt-3" />
-                                                        )
-                                                    }
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
+
                                     </div>
                                 )}
-                                <TextAreaBox
-                                    message={text}
-                                    handleChange={handleChange}
-                                    handleKeyDown={handleKeyDown}
-                                    isDisable={selectedContext.textDisable}
-                                    autoFocus={isWebSearchActive}
-                                    onPaste={handlePasteFiles}
-                                    ref={textareaRef}
-                                />
-                                <div className="flex items-center z-10 px-4 pb-[6px]">
-                                    {/* Plus Menu Button */}
-                                    <button
+
+                                    <TextAreaBox
+                                        message={text}
+                                        handleChange={handleChange}
+                                        handleKeyDown={handleKeyDown}
+                                        isDisable={selectedContext.textDisable}
+                                        autoFocus={isWebSearchActive}
+                                        onPaste={handlePasteFiles}
+                                        ref={textareaRef}
+                                    />
+                                    <div className="flex items-center z-10 px-4 pb-[6px]">
+                                        {/* Plus Menu Button */}
+                                        <button
                                             ref={plusButtonRef}
                                             onClick={() => setShowPlusMenu(!showPlusMenu)}
                                             className="p-2 hover:bg-gray-100 rounded-md transition-colors relative"

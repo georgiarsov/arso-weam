@@ -76,9 +76,12 @@ import Link from 'next/link';
 import CustomPromptAction from '@/actions/CustomPromptAction';
 import PromptCardSkeleton from '@/components/Loader/PromptCardSkeleton';
 import { PagesIcon } from '@/icons/PagesIcon';
+import WorkflowIcon from '@/icons/WorkflowIcon';
 import AgentCardSkeleton from '../Loader/AgentCardSkeleton';
 import CustomBotAction from '@/actions/CustomTemplateAction';
 import Plus from '@/icons/Plus';
+import useWorkflow from '@/hooks/workflow/useWorkflow';
+import { WorkflowType } from '@/types/brain';
 import { 
     getCachedPrompts, 
     getCachedAgents, 
@@ -344,6 +347,12 @@ const ChatInput = ({ aiModals }: ChatInputProps) => {
                 text: 'Pages',
                 id: 5,
                 href: routes.pages,
+            },
+            {
+                icon: <WorkflowIcon width={18} height={18} className="fill-b6 group-hover:fill-white w-4 h-auto" />,
+                text: 'Workflows',
+                id: 6,
+                href: routes.workflows,
             },
         ];
 
@@ -650,6 +659,7 @@ const ChatInput = ({ aiModals }: ChatInputProps) => {
     };
     const [showAgentList, setShowAgentList] = useState(false);
     const [showPromptList, setShowPromptList] = useState(false);
+    const [showWorkflowList, setShowWorkflowList] = useState(false);
     const agentPromptDropdownRef = useRef<HTMLDivElement>(null);
     const [showPlusMenu, setShowPlusMenu] = useState(false);
     const [showBookmarkDialog, setShowBookmarkDialog] = useState(false);
@@ -666,6 +676,9 @@ const ChatInput = ({ aiModals }: ChatInputProps) => {
 
         // Show prompt list if first character is '/'
         setShowPromptList(value.startsWith('/'));
+
+        // Show workflow list if first character is '#'
+        setShowWorkflowList(value.startsWith('#'));
     };
 
     useEffect(() => {
@@ -676,6 +689,7 @@ const ChatInput = ({ aiModals }: ChatInputProps) => {
             ) {
                 setShowAgentList(false);
                 setShowPromptList(false);
+                setShowWorkflowList(false);
             }
             if (
                 plusMenuRef.current &&
@@ -686,13 +700,14 @@ const ChatInput = ({ aiModals }: ChatInputProps) => {
                 setShowPlusMenu(false);
             }
         }
-        if (showAgentList || showPromptList || showPlusMenu) {
+        if (showAgentList || showPromptList || showWorkflowList || showPlusMenu) {
             document.addEventListener('mousedown', handleClickOutside);
         }
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [showAgentList, showPromptList, showPlusMenu]);
+    }, [showAgentList, showPromptList, showWorkflowList, showPlusMenu]);
+
 
 
     const {
@@ -702,6 +717,9 @@ const ChatInput = ({ aiModals }: ChatInputProps) => {
         paginator: agentPaginator,
         setCustomGptList
     } = useCustomGpt();
+
+    // Workflow list hook
+    const { getList: getTabWorkflowList, workflowList: workflows, loading: workflowLoader, setWorkflowList } = useWorkflow(searchParams.get('b'));
 
 
     // Fetch custom prompts from prompt library on component mount
@@ -779,11 +797,15 @@ const ChatInput = ({ aiModals }: ChatInputProps) => {
             getTabAgentList(debouncedSearchValue);
             setPromptList([]);
             getTabPromptList(debouncedSearchValue);
+            setWorkflowList([]);
+            getTabWorkflowList(debouncedSearchValue);
         } else {
             setCustomGptList([]);
             getTabAgentList('');
             setPromptList([]);
             getTabPromptList('');
+            setWorkflowList([]);
+            getTabWorkflowList('');
         }
     }, [debouncedSearchValue]);
 
@@ -800,6 +822,12 @@ const ChatInput = ({ aiModals }: ChatInputProps) => {
         setShowAgentList(false);
         setMessage('');
     };
+
+    const handleWorkflowSelection = (workflow: WorkflowType) => {
+        setMessage(`#${workflow.name} `);
+        setShowWorkflowList(false);
+    };
+    
     const handleInputChanges = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchValue(e.target.value);
     };
@@ -866,7 +894,7 @@ const ChatInput = ({ aiModals }: ChatInputProps) => {
                 </div>
 
                 <div className="relative mt-8 md:mb-10 mb-2">
-                {(showAgentList || showPromptList) && (
+                {(showAgentList || showPromptList || showWorkflowList) && (
                     <div className='absolute bottom-full w-full z-10' ref={agentPromptDropdownRef}>
                         {showAgentList && (
                             <div className='w-full p-4 border rounded-lg mb-1 bg-white'>
@@ -1002,6 +1030,63 @@ const ChatInput = ({ aiModals }: ChatInputProps) => {
                                         {
                                             loading && (
                                                 <ThreeDotLoader className="justify-start ml-8 mt-3" />
+                                            )
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {showWorkflowList && (
+                            <div className='w-full p-4 border rounded-lg mb-1 bg-white'>
+                                <div className='workflow-list'>
+                                    <div className='flex mb-1'>
+                                        <div className="relative w-full">
+                                            <input
+                                                type="text"
+                                                className="text-font-14 pl-[36px] py-2 w-full focus:outline-none focus:border-none bg-transparent"
+                                                id="searchWorkflows"
+                                                placeholder="Search Workflows"
+                                                onChange={handleInputChanges}
+                                                value={searchValue}
+                                            />
+                                            <span className="inline-block absolute left-[12px] top-1/2 -translate-y-1/2">
+                                                <SearchIcon className="w-3 h-auto fill-b6" />
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="pr-1 h-full overflow-y-auto max-md:overflow-x-hidden w-full max-h-[250px]">
+                                        {
+                                            workflows?.length > 0 && (
+                                                workflows.map((workflow: WorkflowType) => (
+                                                    <div
+                                                        key={workflow._id}
+                                                        className="cursor-pointer border-b10 py-1.5 px-2.5 transition-all ease-in-out rounded-md hover:bg-b12"
+                                                        onClick={() => handleWorkflowSelection(workflow)}
+                                                    >
+                                                        <div className="flex items-center flex-wrap xl:flex-nowrap">
+                                                            <p className="text-font-12 font-medium text-b2 mr-2">
+                                                                {workflow.name}
+                                                            </p>
+                                                        </div>
+                                                        {workflow.description && (
+                                                            <p className="text-font-12 font-normal text-b6 mt-1 truncate">
+                                                                {workflow.description}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                ))
+                                            )
+                                        }
+                                        {
+                                            workflowLoader && (
+                                                <ThreeDotLoader className="justify-start ml-8 mt-3" />
+                                            )
+                                        }
+                                        {
+                                            !workflowLoader && workflows?.length === 0 && (
+                                                <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                                                    No workflows found
+                                                </div>
                                             )
                                         }
                                     </div>

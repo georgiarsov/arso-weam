@@ -314,6 +314,18 @@ const apiList = {
         url: () => `${WEB}/chat/get/search-metadata`,
         method: 'POST'
     },
+    syncWorkflows: {
+        url: () => `${WEB}/workflow/sync`,
+        method: 'POST'
+    },
+    executeWorkflow: {
+        url: () => `${WEB}/workflow/execute`,
+        method: 'POST'
+    },
+    saveWorkflowToN8n: {
+        url: () => `${WEB}/workflow/save-to-n8n`,
+        method: 'POST'
+    },
     commonUrl: (prefix: string, module: string) => ({
         list: {
             url: () => `${prefix}/${module}/list`,

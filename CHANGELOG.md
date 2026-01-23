@@ -29,7 +29,7 @@ This project follows **Semantic Versioning**.
 ### Features & Enhancements
 
 * **n8n MCP Integration** - Added comprehensive n8n (Model Context Protocol) server integration
-  * `create_n8n_workflow` tool for creating n8n workflows via MCP
+  * `create_n8n_workflow` tool for generating n8n workflow JSON (displays with "Save to n8n" button for user-controlled saving)
   * `execute_n8n_workflow` tool supporting multiple trigger types (form, webhook, schedule, chat, manual)
   * `update_n8n_workflow` tool support via MCP
   * Full n8n API compliance with strict schema adherence
