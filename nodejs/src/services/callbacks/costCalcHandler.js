@@ -295,7 +295,12 @@ function createCostCalcCallbackHandler(modelName, options = {}) {
             }
             
         } catch (error) {
-            console.error('Error in handleLLMEnd:', error);
+            // Check if error is due to closed stream controller
+            if (error.code === 'ERR_INVALID_STATE' && error.message && error.message.includes('Controller is already closed')) {
+                logger.warn('[COST_TRACKING] Stream controller already closed - skipping final update. This is expected if the stream errored earlier.');
+            } else {
+                logger.error('[COST_TRACKING] Error in handleLLMEnd:', error);
+            }
         }
     }
 

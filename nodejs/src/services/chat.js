@@ -437,12 +437,41 @@ const enhancePrompt = async (req) => {
 const getSearchMetadata = async (req) => {
     try {
         const { query, messageId } = req.body;
+        
+        // Validate SearxNG URL is configured
+        if (!LINK.SEARXNG_API_URL) {
+            logger.error('[SEARXNG] SearxNG URL not configured for metadata search');
+            return { images: [], videos: [] };
+        }
+        
         // always need first page latest results only
-        const result = await fetch(`${LINK.SEARXNG_API_URL}/search?q=${query}&categories=images,videos&format=json&pageno=1`);
+        const searchUrl = `${LINK.SEARXNG_API_URL}/search?q=${encodeURIComponent(query)}&categories=images,videos&format=json&pageno=1`;
+        logger.debug(`[SEARXNG] Fetching metadata from: ${searchUrl}`);
+        
+        const result = await fetch(searchUrl, {
+            method: 'GET',
+            timeout: 15000,
+            headers: {
+                Accept: 'application/json',
+                'User-Agent': 'Mozilla/5.0',
+            }
+        });
+        
+        if (!result.ok) {
+            logger.error(`[SEARXNG] Metadata search failed: HTTP ${result.status} ${result.statusText}`);
+            return { images: [], videos: [] };
+        }
+        
         const data = await result.json();
         const images = [], videos = [];
+        
+        if (!data.results || !Array.isArray(data.results)) {
+            logger.warn('[SEARXNG] No results array in metadata response');
+            return { images: [], videos: [] };
+        }
+        
         data.results.forEach((result) => {
-            if (result.category.startsWith('images')) {
+            if (result.category && result.category.startsWith('images')) {
                 if (images.length >= 10) return;
                 images.push({
                     url: result.url,
@@ -451,7 +480,7 @@ const getSearchMetadata = async (req) => {
                     title: result.title,
                 });
             }
-            if (result.category.startsWith('videos')) {
+            if (result.category && result.category.startsWith('videos')) {
                 if (videos.length >= 10) return;
                 videos.push({
                     url: result.url,
@@ -460,6 +489,9 @@ const getSearchMetadata = async (req) => {
                 });
             }
         });
+        
+        logger.info(`[SEARXNG] Metadata found: ${images.length} images, ${videos.length} videos`);
+        
         if (images.length) {
             const message = await Message.findById({ _id: messageId }, { ai: 1 });
             if (message) {
@@ -475,7 +507,13 @@ const getSearchMetadata = async (req) => {
         }
         return { images, videos };
     } catch (error) {
+        logger.error('[SEARXNG] Error fetching metadata:', {
+            error: error.message,
+            code: error.code,
+            query: req.body?.query
+        });
         handleError(error, 'Error - getSearchMetadata');
+        return { images: [], videos: [] };
     }
 }
 

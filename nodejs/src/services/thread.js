@@ -18,7 +18,7 @@ const { MODAL_NAME } = require('../config/constants/aimodal');
 
 const sendMessage = async (payload) => {
     try {
-        Thread.create({
+        await Thread.create({
             ...payload, 
             message: encryptedData(JSON.stringify(payload.message)),
             user: formatUser(payload.user),
@@ -748,14 +748,25 @@ const _fetchThreadModelData = async (threadId) => {
  */
 const _safeFetchThreadData = async (threadId) => {
     try {
+        if (!threadId) {
+            logger.warn('[THREAD] No thread ID provided to _safeFetchThreadData');
+            return null;
+        }
+        
+        // Validate MongoDB ObjectId format
+        if (!mongoose.Types.ObjectId.isValid(threadId)) {
+            logger.warn(`[THREAD] Invalid thread ID format: ${threadId}`);
+            return null;
+        }
+        
         const thread = await _fetchThreadModelData(threadId);
         if (!thread) {
-            console.warn(`Thread not found with ID: ${threadId}`);
+            logger.warn(`[THREAD] Thread not found with ID: ${threadId} - May not be created yet or was deleted`);
             return null;
         }
         return thread;
     } catch (error) {
-        console.error('Error in safe fetch thread data:', error);
+        logger.error('[THREAD] Error in safe fetch thread data:', error);
         return null;
     }
 };
@@ -769,7 +780,7 @@ const _safeFetchThreadData = async (threadId) => {
 const updateThreadFields = async (threadId, updateData) => {
     try {
         if (!threadId) {
-            console.error('Thread ID is required for update');
+            logger.error('[THREAD] Thread ID is required for update');
             return false;
         }
 
@@ -780,16 +791,74 @@ const updateThreadFields = async (threadId, updateData) => {
         );
 
         if (!result) {
-            console.error(`Thread not found for update: ${threadId}`);
+            logger.warn(`[THREAD] Thread not found for update: ${threadId}`);
             return false;
         }
 
-        console.log('Thread fields updated successfully');
+        logger.info('[THREAD] Thread fields updated successfully');
         return true;
     } catch (error) {
-        console.error('Error updating thread fields:', error);
+        logger.error('[THREAD] Error updating thread fields:', error);
         return false;
     }
+};
+
+/**
+ * Update thread fields with retry logic for race conditions
+ * @param {string} threadId - Thread ID
+ * @param {object} updateData - Data to update
+ * @param {number} maxRetries - Maximum retry attempts (default: 3)
+ * @returns {Promise<boolean>} Success status
+ */
+const updateThreadFieldsWithRetry = async (threadId, updateData, maxRetries = 3) => {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            if (!threadId) {
+                logger.warn('[THREAD] Thread ID is required for update');
+                return false;
+            }
+
+            // Validate MongoDB ObjectId format
+            if (!mongoose.Types.ObjectId.isValid(threadId)) {
+                logger.warn(`[THREAD] Invalid thread ID format: ${threadId}`);
+                return false;
+            }
+
+            const result = await Thread.findByIdAndUpdate(
+                threadId,
+                { $set: updateData },
+                { new: true, upsert: false }
+            );
+
+            if (result) {
+                logger.info(`[THREAD] Thread fields updated successfully (attempt ${attempt + 1})`);
+                return true;
+            }
+
+            // Thread not found, wait and retry
+            logger.warn(`[THREAD] Thread not found for update: ${threadId} (attempt ${attempt + 1}/${maxRetries})`);
+            
+            if (attempt < maxRetries - 1) {
+                // Exponential backoff: 100ms, 200ms, 400ms
+                const delay = 100 * Math.pow(2, attempt);
+                logger.info(`[THREAD] Retrying in ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        } catch (error) {
+            logger.error(`[THREAD] Error updating thread fields (attempt ${attempt + 1}):`, error);
+            if (attempt === maxRetries - 1) {
+                return false;
+            }
+            // Wait before retry on error too
+            if (attempt < maxRetries - 1) {
+                const delay = 100 * Math.pow(2, attempt);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+    }
+    
+    logger.error(`[THREAD] Failed to update thread after ${maxRetries} attempts: ${threadId}`);
+    return false;
 };
 
 /**
@@ -809,11 +878,12 @@ const updateTokenFields = async (threadId, tokenData) => {
             'tokens.imageT': tokenData.imageT || 0
         };
         
-        const success = await updateThreadFields(threadId, updateData);
+        // Use retry logic for token updates to handle race conditions
+        const success = await updateThreadFieldsWithRetry(threadId, updateData);
         
         return success;
     } catch (error) {
-        console.error('❌ [THREAD_REPO] Error updating token fields:', error);
+        logger.error('❌ [THREAD] Error updating token fields:', error);
         return false;
     }
 };
@@ -1001,6 +1071,7 @@ module.exports = {
     searchMessage,
     createLLMConversation,
     updateThreadFields,
+    updateThreadFieldsWithRetry,
     updateTokenFields,
     getTokenUsageDict,
     updateTokenUsage,

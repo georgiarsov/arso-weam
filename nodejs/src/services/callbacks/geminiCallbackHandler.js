@@ -131,7 +131,12 @@ function createGeminiCostCalcCallbackHandler(modelName, options = {}) {
                 }
             }
         } catch (error) {
-            logger.error('❌ [GEMINI_COST] Error in handleLLMEnd:', error);
+            // Check if error is due to closed stream controller
+            if (error.code === 'ERR_INVALID_STATE' && error.message && error.message.includes('Controller is already closed')) {
+                logger.warn('[GEMINI_COST] Stream controller already closed - skipping final update. This is expected if the stream errored earlier.');
+            } else {
+                logger.error('❌ [GEMINI_COST] Error in handleLLMEnd:', error);
+            }
         }
     }
 

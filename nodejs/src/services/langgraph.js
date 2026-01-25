@@ -611,6 +611,7 @@ async function callTool(state, agentDetails = null, userData = null) {
                     new ToolMessage({
                         content: formattedOutput,
                         tool_call_id: toolCall.id,
+                        name: toolCall.name,
                     }),
                 );
             } catch (error) {
@@ -625,6 +626,7 @@ async function callTool(state, agentDetails = null, userData = null) {
                     new ToolMessage({
                         content: errorOutput,
                         tool_call_id: toolCall.id,
+                        name: toolCall.name,
                     }),
                 );
             }
@@ -634,6 +636,7 @@ async function callTool(state, agentDetails = null, userData = null) {
                 new ToolMessage({
                     content: `Tool '${toolCall.name}' not found or not available. Available tools: ${Object.keys(toolExecutorMap).join(', ')}`,
                     tool_call_id: toolCall.id,
+                    name: toolCall.name || 'unknown_tool',
                 }),
             );
         }
@@ -1582,9 +1585,21 @@ async function streamAndLog(app, data, socket, threadId = null) {
                 break;
             }
 
-            const handler = eventHandlers[chunk.event];
-            if (handler) {
-                handler(chunk);
+            try {
+                const handler = eventHandlers[chunk.event];
+                if (handler) {
+                    await handler(chunk);
+                }
+            } catch (eventError) {
+                // Log but don't break the stream for individual event errors
+                logger.error(`Error handling event ${chunk.event}:`, eventError);
+                
+                // Only break if it's a critical Gemini tool error
+                if (eventError.message && eventError.message.includes('tool name for each tool call')) {
+                    logger.error('Critical Gemini tool error detected - stopping stream');
+                    proccedMsg += '\n\n⚠️ Error: Tool execution failed. Please try again.';
+                    break;
+                }
             }
         }
         await createLLMConversation({ 

@@ -159,34 +159,54 @@ class MongoDBChatMessageHistory {
                 createdAt: new Date()
             };
             
+            // Detect message type - support both old format and LangChain message objects
+            let messageType;
+            let messageContent;
+            let messageKwargs = {};
+            
+            // Check if it's a LangChain message object (has _getType method)
+            if (typeof message._getType === 'function') {
+                messageType = message._getType();
+                messageContent = message.content;
+                messageKwargs = message.additional_kwargs || {};
+            } else if (message.type) {
+                // Old format with message.type and message.data
+                messageType = message.type;
+                messageContent = message.data?.content || message.content;
+                messageKwargs = message.data?.additional_kwargs || {};
+            } else {
+                logger.error('Unknown message format:', message);
+                return false;
+            }
+            
             // Encrypt the message content based on type
-            if (message.type === 'human') {
+            if (messageType === 'human') {
                 const humanContent = JSON.stringify({
-                    content: message.data.content,
-                    additional_kwargs: {}
+                    content: messageContent,
+                    additional_kwargs: messageKwargs
                 });
                 messageData.message = encryptedData(humanContent);
-            } else if (message.type === 'ai') {
+            } else if (messageType === 'ai') {
                 const aiContent = JSON.stringify({
-                    content: message.data.content,
-                    additional_kwargs: {}
+                    content: messageContent,
+                    additional_kwargs: messageKwargs
                 });
                 messageData.ai = encryptedData(aiContent);
-            } else if (message.type === 'system') {
+            } else if (messageType === 'system') {
                 const systemContent = JSON.stringify({
-                    content: message.data.content
+                    content: messageContent
                 });
                 messageData.system = encryptedData(systemContent);
                 
                 // Generate a checkpoint hash for system messages
                 const checkpointHash = crypto
                     .createHash('sha256')
-                    .update(message.data.content + Date.now().toString())
+                    .update(messageContent + Date.now().toString())
                     .digest('hex');
                 messageData.sumhistory_checkpoint = checkpointHash;
                 
                 // Update memory buffer
-                this.memoryBuffer = message.data.content;
+                this.memoryBuffer = messageContent;
             }
             
             // Check if a similar message already exists to prevent duplicates
@@ -196,11 +216,11 @@ class MongoDBChatMessageHistory {
             };
             
             // Add type-specific field to query
-            if (message.type === 'human') {
+            if (messageType === 'human') {
                 existingQuery.message = { $exists: true };
-            } else if (message.type === 'ai') {
+            } else if (messageType === 'ai') {
                 existingQuery.ai = { $exists: true };
-            } else if (message.type === 'system') {
+            } else if (messageType === 'system') {
                 existingQuery.system = { $exists: true };
             }
             
@@ -215,6 +235,36 @@ class MongoDBChatMessageHistory {
             return true;
         } catch (error) {
             logger.error(`Error saving message to MongoDB: ${error.message}`, error);
+            return false;
+        }
+    }
+
+    /**
+     * Add a user message to MongoDB
+     * This method is required by ConversationSummaryBufferMemory.saveContext()
+     */
+    async addUserMessage(content) {
+        try {
+            const humanMessage = new HumanMessage(content);
+            await this.addMessage(humanMessage);
+            return true;
+        } catch (error) {
+            logger.error(`Error adding user message: ${error.message}`, error);
+            return false;
+        }
+    }
+
+    /**
+     * Add an AI message to MongoDB
+     * This method is required by ConversationSummaryBufferMemory.saveContext()
+     */
+    async addAIChatMessage(content) {
+        try {
+            const aiMessage = new AIMessage(content);
+            await this.addMessage(aiMessage);
+            return true;
+        } catch (error) {
+            logger.error(`Error adding AI message: ${error.message}`, error);
             return false;
         }
     }
