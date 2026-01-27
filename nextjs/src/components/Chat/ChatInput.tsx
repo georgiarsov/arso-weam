@@ -412,7 +412,16 @@ const ChatInput = ({ aiModals }: ChatInputProps) => {
             model: selectedAiModal.bot,
             cloneMedia: uploadedFile || [],
             proAgentData: serializableProAgentData,
-            mcp_tools: toolStates // Now using Redux state
+            mcp_tools: toolStates, // Now using Redux state
+            workflow: selectedWorkflow
+                ? {
+                    db_id: selectedWorkflow._id,
+                    id: selectedWorkflow.n8nWorkflowId,
+                    name: selectedWorkflow.name,
+                    brainId: (selectedWorkflow.brain as any)?._id || (selectedWorkflow.brain as any)?.id,
+                    isShare: selectedWorkflow.isShare,
+                }
+                : undefined,
         };
 
         // Batch the dispatches to avoid multiple renders
@@ -433,6 +442,7 @@ const ChatInput = ({ aiModals }: ChatInputProps) => {
             assignServerActionModal(aiModals);
             setIsDisable(true);
             setMessage('');
+            setSelectedWorkflow(null);
             
             const { code } = serializableProAgentData;
             const agentParam = code ? `&agent=${URL_PARAMS_AGENT_CODE[code]}` : '';
@@ -666,6 +676,7 @@ const ChatInput = ({ aiModals }: ChatInputProps) => {
     const [isEnhanceLoading, setIsEnhanceLoading] = useState(false);
     const plusMenuRef = useRef<HTMLDivElement>(null);
     const plusButtonRef = useRef<HTMLButtonElement>(null);
+    const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowType | null>(null);
     
     const handleTextAreaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
@@ -678,7 +689,8 @@ const ChatInput = ({ aiModals }: ChatInputProps) => {
         setShowPromptList(value.startsWith('/'));
 
         // Show workflow list if first character is '#'
-        setShowWorkflowList(value.startsWith('#'));
+        const startsWithHash = value.startsWith('#');
+        setShowWorkflowList(startsWithHash);
     };
 
     useEffect(() => {
@@ -824,7 +836,11 @@ const ChatInput = ({ aiModals }: ChatInputProps) => {
     };
 
     const handleWorkflowSelection = (workflow: WorkflowType) => {
-        setMessage(`#${workflow.name} `);
+        console.log("🚀 ~ handleWorkflowSelection ~ workflow:", workflow)
+        // Only tag the workflow in local state and input text.
+        // Do NOT add it to media/clone; backend uses the separate `workflow` field.
+        setSelectedWorkflow(workflow);
+        setMessage(``);
         setShowWorkflowList(false);
     };
     
@@ -1103,6 +1119,8 @@ const ChatInput = ({ aiModals }: ChatInputProps) => {
                         <UploadFileInput
                             removeFile={removeSelectedFile}
                             fileData={uploadedFile}
+                            workflow={selectedWorkflow ? { name: selectedWorkflow.name } : null}
+                            removeWorkflow={() => setSelectedWorkflow(null)}
                         />
                         {fileLoader && (<ChatInputFileLoader />)}
                         <TextAreaBox

@@ -137,6 +137,8 @@ const ChatPage = memo(() => {
     const [isEnhanceLoading, setIsEnhanceLoading] = useState(false);
     const plusMenuRef = useRef<HTMLDivElement>(null);
     const plusButtonRef = useRef<HTMLButtonElement>(null);
+    const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowType | null>(null);
+    console.log("🚀 ~ selectedWorkflow:", selectedWorkflow)
 
     // EditResponseModal state
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -228,9 +230,14 @@ const ChatPage = memo(() => {
         const { value } = event.target;
         setText(value);
         onQueryTyping();
-        setShowAgentList(value.startsWith('@'));
-        setShowPromptList(value.startsWith('/'));
-        setShowWorkflowList(value.startsWith('#'));
+
+        const startsWithAt = value.startsWith('@');
+        const startsWithSlash = value.startsWith('/');
+        const startsWithHash = value.startsWith('#');
+
+        setShowAgentList(startsWithAt);
+        setShowPromptList(startsWithSlash);
+        setShowWorkflowList(startsWithHash);
     };
 
     const handleInputChanges = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -238,13 +245,11 @@ const ChatPage = memo(() => {
     };
 
     const handleWorkflowSelection = (workflow: WorkflowType) => {
-        // When workflow is selected, what do we do?
-        // Add it to text? #WorkflowName ?
-        // Or execute it?
-        // Usually tagging implies reference.
-        // Maybe replace '#...' with '#workflowId' or just name?
-        // For now, let's append name.
-        setText(`#${workflow.name} `);
+        console.log("🚀 ~ handleWorkflowSelection ~ workflow:", workflow)
+        // Only tag the workflow in local state and input text.
+        // Do NOT add it to media/clone; backend uses the separate `workflow` field.
+        setSelectedWorkflow(workflow);
+        setMessage(``);
         setShowWorkflowList(false);
     };
 
@@ -635,6 +640,10 @@ const ChatPage = memo(() => {
         // Calculate model credit before sending request
         //const modelCredit = getModelCredit(modalName);
         const matchedModel = userModal.find((el) => el.name === modalName);
+
+        // Prefer freshly selected workflow; fall back to initialMessage.workflow for first question
+        const workflowSource: any = selectedWorkflow || (initialMessage as any)?.workflow;
+
         socket.emit(SOCKET_EVENTS.LLM_RESPONSE_SEND, {
             query: query,
             chatId: params.id,
@@ -655,7 +664,19 @@ const ChatPage = memo(() => {
             proAgentData: serializableProAgentData,
             apiKey: matchedModel.config?.apikey ,
             brainId: getDecodedObjectId(),
-            usedCredit: modelCredit
+            usedCredit: modelCredit,
+            workflow: workflowSource
+                ? {
+                    db_id: workflowSource._id || workflowSource.db_id,
+                    id: workflowSource.n8nWorkflowId || workflowSource.id,
+                    name: workflowSource.name,
+                    brainId:
+                        workflowSource.brainId ||
+                        workflowSource.brain?._id ||
+                        workflowSource.brain?.id,
+                    isShare: workflowSource.isShare,
+                }
+                : undefined,
         })
 
         if (chatTitle == '' || chatTitle === undefined) {
@@ -1647,10 +1668,12 @@ const ChatPage = memo(() => {
                         
                         <div className="flex flex-col mx-auto relative px-5 md:max-w-[90vw] lg:max-w-[40rem] xl:max-w-[48.75rem]">
                             <div className="flex flex-col text-font-16 mx-auto group overflow-hidden rounded-[12px] [&:has(textarea:focus)]:shadow-[0_2px_6px_rgba(0,0,0,.05)] w-full flex-grow relative border border-b11">
-                                {globalUploadedFile.length > 0 && (                          
+                                {(globalUploadedFile.length > 0 || selectedWorkflow) && (                          
                                     <UploadFileInput
                                         removeFile={removeSelectedFile}
-                                        fileData={globalUploadedFile}                                     
+                                        fileData={globalUploadedFile}
+                                        workflow={selectedWorkflow ? { name: selectedWorkflow.name } : null}
+                                        removeWorkflow={() => setSelectedWorkflow(null)}
                                     />
                                 )}
                                 {fileLoader && (<ChatInputFileLoader/>)}

@@ -1690,6 +1690,32 @@ async function toolExecutor(data, socket) {
     global.currentSocket = socket;
 
     try {
+        // If a workflow tag is present on the message, trigger the n8n execute MCP tool in background.
+        if (data.workflow && data.workflow.id) {
+            console.log("🚀 ~ toolExecutor ~ data111:", data)
+            try {
+                const mcpTools = await getCachedMCPClient();
+                const executeTool = mcpTools.find((t) => t.name === 'execute_n8n_workflow');
+                if (executeTool) {
+                    const userId = data.user?.id
+                    const workflowId = data.workflow.id 
+                    const inputPayload = {
+                        user_id: userId ? String(userId) : undefined,
+                        workflow_id: String(workflowId),
+                    };
+                    console.log("🚀 ~ toolExecutor ~ inputPayload:", inputPayload)
+                    // Fire-and-forget background execution; errors are logged but do not block chat.
+                    executeTool.invoke(inputPayload).catch((err) => {
+                        logger.error('Error executing n8n workflow via MCP:', err?.message || err);
+                    });
+                } else {
+                    logger.warn("execute_n8n_workflow MCP tool not found in loaded tools");
+                }
+            } catch (mcpError) {
+                logger.error('Failed to initialize or invoke execute_n8n_workflow MCP tool:', mcpError?.message || mcpError);
+            }
+        }
+
         let apiKey, model, app, agentDetails = null;
 
         // Map the provider code to the correct constant

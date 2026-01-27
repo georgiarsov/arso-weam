@@ -8,9 +8,15 @@ import { DynamicImage } from '@/widgets/DynamicImage';
 import { UploadedFileType } from '@/types/chat';
 import { extractFileType, getDisplayModelName } from '@/utils/helper';
 
+type WorkflowTagType = {
+    name: string;
+};
+
 type UploadFileInputProps = {
     fileData: UploadedFileType[];
     removeFile: (index: number) => void;
+    workflow?: WorkflowTagType | null;
+    removeWorkflow?: () => void;
 }
 
 type RenderAgentProps = {
@@ -38,6 +44,11 @@ type RenderPromptProps = {
     promptData: UploadedFileType;
     removeFile: (index: number) => void;
     index: number;
+}
+
+type RenderWorkflowTagProps = {
+    workflow: WorkflowTagType;
+    onRemove?: () => void;
 }
 
 export const DEEPSEEK_WORD = 'deepseek';
@@ -225,24 +236,19 @@ const RenderAgentAndDocument = ({ fileData, removeFile }: RenderAgentAndDocument
             <div className="flex gap-2 flex-wrap">
                 {fileData?.length > 0 && (
                     <>
-                        {
-                            fileData.map((file: UploadedFileType, index: number) => (
-                                <React.Fragment key={index}>
-                                {
-                                    file.isDocument &&
-                                    <RenderImageAndDocuments file={file} removeFile={removeFile} index={index}/>
-                                }
-                                {
-                                    file.isCustomGpt &&
-                                    <RenderAgent agentData={file} removeFile={removeFile} index={index}/>
-                                }
-                                {
-                                    file.isPrompt &&
-                                    <RenderPrompt promptData={file} removeFile={removeFile} index={index}/>
-                                }
-                                </React.Fragment>
-                            ))
-                        }
+                        {fileData.map((file: UploadedFileType, index: number) => (
+                            <React.Fragment key={index}>
+                                {file.isDocument && (
+                                    <RenderImageAndDocuments file={file} removeFile={removeFile} index={index} />
+                                )}
+                                {file.isCustomGpt && (
+                                    <RenderAgent agentData={file} removeFile={removeFile} index={index} />
+                                )}
+                                {file.isPrompt && (
+                                    <RenderPrompt promptData={file} removeFile={removeFile} index={index} />
+                                )}
+                            </React.Fragment>
+                        ))}
                     </>
                 )}
             </div>
@@ -250,31 +256,73 @@ const RenderAgentAndDocument = ({ fileData, removeFile }: RenderAgentAndDocument
     )
 }
 
-const UploadFileInput = ({ fileData, removeFile}: UploadFileInputProps) => {
-    if (!fileData.length) return null;
-    const hasAgent = Array.isArray(fileData) && fileData.some(file => file.isCustomGpt);
-    const hasDocument = Array.isArray(fileData) && fileData.some(file => file.isDocument);
-    const hasPrompt = Array.isArray(fileData) && fileData.some(file => file.isPrompt);
-    const agentData = Array.isArray(fileData) && fileData.find(file => file.isCustomGpt);
-    const promptData = Array.isArray(fileData) && fileData.find(file => file.isPrompt);
-    if ((hasAgent && hasDocument) || (hasAgent && hasPrompt) || (hasPrompt && hasDocument)) {
-        return <RenderAgentAndDocument fileData={fileData} removeFile={removeFile}/>
-    }
+const RenderWorkflowTag = ({ workflow, onRemove }: RenderWorkflowTagProps) => {
+    if (!workflow) return null;
+    return (
+        <div className="attach-item flex flex-wrap items-center gap-2 group/item relative w-full p-2 rounded-[10px] border-b-2 mb-2">
+            <span
+                className="opacity-0 group-hover/item:opacity-100 invisible group-hover/item:visible absolute top-0.5 right-0.5 cursor-pointer p-1"
+                onClick={() => onRemove?.()}
+            >
+                <Close
+                    width={'8'}
+                    height={'8'}
+                    className="fill-b7 size-2 object-contain"
+                />
+            </span>
+            <div className="flex items-center gap-2">
+                <div className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-b12 text-[11px] text-b5 font-medium">
+                    WF
+                </div>
+                <p className="text-font-14 font-medium truncate max-w-[180px]">
+                    {workflow.name}
+                </p>
+                <span className="block text-[11px] text-b2 bg-b12 px-2 py-[2px] rounded-lg">
+                    Workflow
+                </span>
+            </div>
+        </div>
+    );
+};
+
+const UploadFileInput = ({ fileData, removeFile, workflow, removeWorkflow }: UploadFileInputProps) => {
+    const hasFiles = Array.isArray(fileData) && fileData.length > 0;
+    const hasWorkflowTag = !!workflow;
+
+    if (!hasFiles && !hasWorkflowTag) return null;
+
+    const hasAgent = hasFiles && fileData.some(file => file.isCustomGpt);
+    const hasDocument = hasFiles && fileData.some(file => file.isDocument);
+    const hasPrompt = hasFiles && fileData.some(file => file.isPrompt);
+
+    const agentData = hasFiles && fileData.find(file => file.isCustomGpt);
+    const promptData = hasFiles && fileData.find(file => file.isPrompt);
+
+    const activeTypesCount = [hasAgent, hasDocument, hasPrompt].filter(Boolean).length;
+    const multipleTypes = hasFiles && activeTypesCount > 1;
+
     return (
         <div className="attached-files p-2">
-            <div className="flex gap-2 flex-wrap">
-                {Array.isArray(fileData) && !hasAgent && !hasPrompt ? (
-                    fileData.map((file, index) => (
-                        <React.Fragment key={file._id}>
-                            <RenderImageAndDocuments file={file} removeFile={removeFile} index={index}/>
-                        </React.Fragment>
-                    ))
-                ) : hasAgent ? (
-                    <RenderAgent agentData={agentData} removeFile={removeFile} index={0}/>
-                ) : (
-                    <RenderPrompt promptData={promptData} removeFile={removeFile} index={0}/>
-                )}
-            </div>
+            {hasWorkflowTag && (
+                <RenderWorkflowTag workflow={workflow} onRemove={removeWorkflow} />
+            )}
+            {hasFiles && (
+                <div className="flex gap-2 flex-wrap">
+                    {multipleTypes ? (
+                        <RenderAgentAndDocument fileData={fileData} removeFile={removeFile} />
+                    ) : hasDocument ? (
+                        fileData.map((file, index) => (
+                            <React.Fragment key={file._id}>
+                                <RenderImageAndDocuments file={file} removeFile={removeFile} index={index} />
+                            </React.Fragment>
+                        ))
+                    ) : hasAgent && agentData ? (
+                        <RenderAgent agentData={agentData} removeFile={removeFile} index={0} />
+                    ) : hasPrompt && promptData ? (
+                        <RenderPrompt promptData={promptData} removeFile={removeFile} index={0} />
+                    ) : null}
+                </div>
+            )}
         </div>
     );
 };
