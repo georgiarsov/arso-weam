@@ -6,7 +6,6 @@ const createWorkflowKeys = joi.object({
     selected: joi.string().regex(/^[0-9a-fA-F]{24}$/).required(), // Brain ID
     trigger: joi.object().optional(),
     n8nWorkflowId: joi.string().optional(),
-    isPrivate: joi.boolean().optional(),
 });
 
 const editWorkflowKeys = joi.object({

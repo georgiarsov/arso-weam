@@ -213,6 +213,10 @@ const apiList = {
         url: () => `${WEB}/customgpt/user/getAll`,
         method: 'POST'
     },
+    tabWorkflowList: {
+        url: () => `${WEB}/workflow/user/getAll`,
+        method: 'POST'
+    },
     tabDocumentList: {
         url: () => `${WEB}/chat-doc/user/getAll`,
         method: 'POST'

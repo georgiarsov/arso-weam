@@ -77,6 +77,16 @@ const saveToN8n = catchAsync(async (req, res) => {
     return util.failureResponse("Failed to save workflow to n8n", res);
 });
 
+const usersWiseGetAll = catchAsync(async (req, res) => {
+    const result = await workflowService.usersWiseGetAll(req);
+    if (result.data.length) {
+        res.message = _localize('module.list', req, WORKFLOW);
+        return util.successListResponse(result, res);
+    }
+    res.message = _localize('module.notFound', req, WORKFLOW);
+    return util.recordNotFound(null, res);
+});
+
 module.exports = {
     addWorkflow,
     getWorkflowList,
@@ -84,5 +94,6 @@ module.exports = {
     deleteWorkflow,
     syncWorkflows,
     executeWorkflow,
-    saveToN8n
+    saveToN8n,
+    usersWiseGetAll
 };

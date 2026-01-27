@@ -23,9 +23,9 @@ const schema = new Schema(
             type: Boolean,
             default: true,
         },
-        isPrivate: {
+        isShare: {
             type: Boolean,
-            default: true,
+            default: false,
         },
 
         // n8n specific fields

@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation';
 import { APIResponseType, DefaultPaginationType, PaginatorType } from '@/types/common';
 import { WorkflowType } from '@/types/brain';
 import { getCurrentUser } from '@/utils/handleAuth';
+import { useSelector } from 'react-redux';
+import { RootState } from '@/lib/store';
 
 const useWorkflow = (b?: string) => {
     const router = useRouter();
@@ -14,6 +16,7 @@ const useWorkflow = (b?: string) => {
     const [paginator, setPaginator] = useState<PaginatorType>({});
     const [workflowList, setWorkflowList] = useState<WorkflowType[]>([]);
     const brainId = useMemo(() => decodedObjectId(b), [b]);
+    const selectedWorkSpace = useSelector((store: RootState) => store.workspacelist.selected);
 
     const createWorkflow = async (data, closeModal) => {
         try {
@@ -144,7 +147,7 @@ const useWorkflow = (b?: string) => {
     const executeWorkflow = async (id, params) => {
         try {
             const response = await commonApi({
-                action: 'executeWorkflow',
+                action: MODULES.EXECUTE_WORKFLOW,
                 common: false,
                 data: { id, params }
             });
@@ -165,12 +168,12 @@ const useWorkflow = (b?: string) => {
             }
 
             const response = await commonApi({
-                action: 'saveWorkflowToN8n',
+                action: MODULES.SAVE_WORKFLOW_TO_N8N,
                 common: false,
                 data: { 
                     workflowJson, 
                     brainId: targetBrainId,
-                    isUpdate 
+                    isUpdate
                 }
             });
             Toast(response.message);
@@ -188,9 +191,42 @@ const useWorkflow = (b?: string) => {
         }
     }
 
+    const getTabWorkflowList = async (searchValue: string, pagination: DefaultPaginationType = { offset: 0, limit: 10 }): Promise<WorkflowType[]> => {
+        try {
+            if (!selectedWorkSpace) return [];
+            setLoading(true);
+            const response: APIResponseType<WorkflowType[]> = await commonApi({
+                action: MODULES.TAB_WORKFLOW_LIST,
+                data: {
+                    options: {
+                        sort: { createdAt: DEFAULT_SORT },
+                        ...pagination
+                    },
+                    query: {
+                        searchColumns: [SEARCH_AND_FILTER_OPTIONS.NORMAL_NAME],
+                        search: searchValue,
+                        workspaceId: selectedWorkSpace._id
+                    }
+                },
+            })
+            if (pagination.offset === 0) {
+                setWorkflowList(response.data);
+            } else {
+                setWorkflowList((prev: WorkflowType[]) => [...prev, ...response.data]);
+            }
+            setPaginator(response.paginator as PaginatorType);
+            return response.data;
+        } catch (error) {
+            console.error('error: ', error);
+        } finally {
+            setLoading(false);
+        }
+    }
+
     return {
         createWorkflow,
         getList,
+        getTabWorkflowList,
         updateWorkflow,
         deleteWorkflow,
         syncWorkflows,

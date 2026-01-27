@@ -719,7 +719,7 @@ const ChatInput = ({ aiModals }: ChatInputProps) => {
     } = useCustomGpt();
 
     // Workflow list hook
-    const { getList: getTabWorkflowList, workflowList: workflows, loading: workflowLoader, setWorkflowList } = useWorkflow(searchParams.get('b'));
+    const { getTabWorkflowList, workflowList: workflows, loading: workflowLoader, setWorkflowList } = useWorkflow(searchParams.get('b'));
 
 
     // Fetch custom prompts from prompt library on component mount

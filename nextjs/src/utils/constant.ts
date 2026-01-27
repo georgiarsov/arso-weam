@@ -59,9 +59,12 @@ export const MODULES = {
     TAB_PROMPT_LIST: 'tabPromptList',
     TAB_AGENT_LIST: 'tabAgentList',
     TAB_DOCUMENT_LIST: 'tabDocumentList',
+    TAB_WORKFLOW_LIST: 'tabWorkflowList',
     CONFIGURATION_ENV: 'configurationEnv',
     IMPORT_CHAT: 'import-chat',
-    WORKFLOW: 'workflow'
+    WORKFLOW: 'workflow',
+    SAVE_WORKFLOW_TO_N8N: 'saveWorkflowToN8n',
+    EXECUTE_WORKFLOW: 'executeWorkflow',
 } as const;
 
 export const MODULE_ACTIONS = {

@@ -339,7 +339,7 @@ const ChatPage = memo(() => {
     } = useCustomGpt();
 
     // Workflow list (placed here to access getDecodedObjectId)
-    let { getList: getTabWorkflowList, workflowList: workflows, loading: workflowLoader, setWorkflowList, saveToN8n } = useWorkflow(queryParams.get('b'));
+    let { getTabWorkflowList, workflowList: workflows, loading: workflowLoader, setWorkflowList, saveToN8n } = useWorkflow(queryParams.get('b'));
 
     // Workflow save/update handler - directly saves n8n workflow JSON to n8n
     const handleSaveWorkflow = useCallback(async (

@@ -6,12 +6,13 @@ const { N8N } = require('../config/config');
 const Brain = require('../models/brains');
 const ShareBrain = require('../models/shareBrain');
 const { accessOfBrainToUser } = require('./common');
+const { getShareBrains, getBrainStatus } = require('./brain');
 const axios = require('axios');
 const { getN8nConfig, makeN8nRequest } = require('../tools/n8n');
 
 const addWorkflow = async (req) => {
     try {
-        const { name, description, selected, trigger, n8nWorkflowId, isPrivate } = req.body;
+        const { name, description, selected, trigger, n8nWorkflowId } = req.body;
 
         // selected is brainId
         const brainId = selected;
@@ -35,7 +36,7 @@ const addWorkflow = async (req) => {
             brain: formatBrain(brain), // Brain snapshot
             trigger,
             n8nWorkflowId,
-            isPrivate: isPrivate ?? true,
+            isShare: brain.isShare || false, // Set based on brain's share status
             isActive: true
         });
 
@@ -134,7 +135,7 @@ const syncWorkflows = async (req) => {
                     workflowData.user = formatUser(req.user);
                     workflowData.brain = formatBrain(brain);
                     workflowData.n8nWorkflowId = remote.id;
-                    workflowData.isPrivate = true; // Default
+                    workflowData.isShare = brain.isShare || false; // Set based on brain's share status
                 }
 
                 const updated = await Workflow.findOneAndUpdate(match, workflowData, { upsert: true, new: true, setDefaultsOnInsert: true });
@@ -291,7 +292,7 @@ const saveToN8n = async (req) => {
             nodes: n8nWorkflowData.nodes || parsedWorkflow.nodes,
             connections: n8nWorkflowData.connections || parsedWorkflow.connections,
             trigger: { type: 'manual', value: '' },
-            isPrivate: true
+            isShare: brain.isShare || false // Set based on brain's share status
         };
 
         let savedWorkflow;
@@ -322,6 +323,30 @@ const saveToN8n = async (req) => {
     }
 };
 
+async function usersWiseGetAll(req) {
+    try {
+        const brains = await getShareBrains(req);
+        if (!brains.length) return { data: [], paginator: {} };
+        const brainStatus = await getBrainStatus(brains);
+        const query = {
+            'brain.id': { $in: brains.filter(ele => ele?.brain?.id).map(ele => ele.brain.id) },
+            ...req.body.query
+        }
+        delete query.workspaceId;
+        const result = await dbService.getAllDocuments(Workflow, query, req.body.options || {});
+        const finalResult = result.data.map((record) => ({
+            ...record._doc,
+            isShare: brainStatus.find((ele) => ele?._id?.toString() === record?.brain?.id?.toString())?.isShare,
+        }))
+        return {
+            data: finalResult,
+            paginator: result.paginator
+        }
+    } catch (error) {
+        handleError(error, 'Error - usersWiseGetAll');
+    }
+}
+
 module.exports = {
     addWorkflow,
     getWorkflowList,
@@ -329,5 +354,6 @@ module.exports = {
     deleteWorkflow,
     syncWorkflows,
     executeWorkflow,
-    saveToN8n
+    saveToN8n,
+    usersWiseGetAll
 };
