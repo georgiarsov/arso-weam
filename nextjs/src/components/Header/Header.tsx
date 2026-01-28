@@ -21,6 +21,7 @@ import { RootState } from '@/lib/store';
 import { matchedBrain } from '../Brains/BrainList';
 import DocumentIcon from '@/icons/DocumentIcon';
 import useConversation from '@/hooks/conversation/useConversation';
+import WorkflowIcon from '@/icons/WorkflowIcon';
 
 const HeaderLayout = () => {
     const params = useParams();
@@ -233,6 +234,18 @@ const Header = () => {
                 heading={'Docs'}
                 icons={
                     <DocumentIcon
+                        width={'18'}
+                        height={'18'}
+                        className={'fill-b2 object-contain'}
+                    />
+                }
+            />
+        ),
+        [routes.workflows]: (
+            <ListHeaderLayout
+                heading={'Workflows'}
+                icons={
+                    <WorkflowIcon
                         width={'18'}
                         height={'18'}
                         className={'fill-b2 object-contain'}

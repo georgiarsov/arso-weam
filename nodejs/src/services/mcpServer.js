@@ -4080,62 +4080,70 @@ async function startMCPServer() {
         }
     );
 
+    // create_n8n_workflow - Returns n8n workflow JSON for user to review and save via "Save to n8n" button
     server.registerTool(
         "create_n8n_workflow",
         {
-            description: `Create a new n8n workflow following the n8n API specification.
+            description: `Generate an n8n workflow JSON that the user can review and save to n8n.
+
+            This tool builds a valid n8n workflow JSON structure and returns it as a code block.
+            The user can then review the workflow and click "Save to n8n" to actually create it in their n8n instance.
 
             **Required Fields:**
             - name: Workflow name (string)
             - nodes: Array of workflow nodes (each node must have: type, name, position, and optionally parameters, typeVersion, id)
-
-            **Optional Fields:**
-            - connections: Object mapping node connections (format: { "NodeName": { "main": [[{ "node": "TargetNode", "type": "main", "index": 0 }]] } })
-            - active: Whether workflow should be active (boolean, default: false)
-            - settings: Workflow settings object (object)
-            - tags: Array of tag IDs or tag objects (array)
-            - description: Workflow description (string)
+            - connections: Object mapping node connections
+            - settings: Object mapping workflow settings.
 
             **Node Structure (per n8n API):**
-            \`\`\`json
-            {
-            "id": "unique-node-id",
-            "name": "Node Name",
-            "type": "n8n-nodes-base.webhook",
-            "typeVersion": 1,
-            "position": [0, 0],
-            "parameters": {}
-            }
-            \`\`\`
+            nodes: [
+                {
+                    "id": "unique-node-id",
+                    "name": "Node Name",
+                    "type": "n8n-nodes-base.webhook",
+                    "typeVersion": 1,
+                    "position": [0, 0],
+                    "parameters": {}
+                }
+            ]
 
-            See: https://docs.n8n.io/api/api-reference/#tag/workflow/POST/workflows`,
+            **Connections Structure:**
+            connections: {
+                "NodeName": {
+                    "main": [
+                    {
+                        "0": {
+                            "node": "NodeName",
+                            "type": "main",
+                            "index": 0
+                        }
+                    }
+                    ]
+                }
+            }
+
+
+            For more information, see: https://docs.n8n.io/api/api-reference/#tag/workflow/POST/workflows`,
             inputSchema: {
-                user_id: z.string().optional().describe("User ID to get n8n API key from. If not provided, the default user will be used."),
-                name: z.string().describe("Name of the workflow (required)"),
-                nodes: z.any().describe("Array of workflow nodes (required). Each node should have: type, name, position [x, y], typeVersion, and optionally parameters, id, credentials, disabled, notes, etc."),
-                connections: z.any().describe("Object mapping node connections (required). Format: { 'NodeName': { 'main': [[{ 'node': 'TargetNode', 'type': 'main', 'index': 0 }]] } }"),
-                settings: z.any().describe("Workflow settings object (required). Can include: executionOrder, saveDataErrorExecution, saveDataSuccessExecution, saveManualExecutions, timezone, etc."),
-                staticData: z.union([z.string(), z.null()]).optional().describe("Static data as JSON string or null (optional)"),
-                shared: z.any().optional().describe("Array of shared workflow objects (optional)")
+                name: z.string().describe("Name of the workflow"),
+                nodes: z.any().describe("Array of workflow nodes. Each node should have: type, name, position [x, y], typeVersion, and optionally parameters, id, credentials"),
+                connections: z.any().describe("Object mapping node connections. Format: { 'NodeName': { 'main': [[{ 'node': 'TargetNode', 'type': 'main', 'index': 0 }]] } }"),
+                user_id: z.string().optional().describe("User ID to get n8n API key from. If not provided, the default user will be used.")
             }
         },
-        async (params) => {
+        async ({ name, nodes, connections = {}, user_id = null }) => {
             try {
-                // Extract and normalize parameters
-                const user_id = params.user_id || null;
-                const name = params.name;
-
                 // Handle nodes - ensure it's an array
-                let nodes = params.nodes;
-                if (!Array.isArray(nodes)) {
-                    if (typeof nodes === 'string') {
+                let parsedNodes = nodes;
+                if (!Array.isArray(parsedNodes)) {
+                    if (typeof parsedNodes === 'string') {
                         try {
-                            nodes = JSON.parse(nodes);
+                            parsedNodes = JSON.parse(parsedNodes);
                         } catch (e) {
                             return {
                                 content: [{
                                     type: "text",
-                                    text: `Error: nodes must be an array. Received: ${typeof nodes}. If you provided a JSON string, it could not be parsed.`
+                                    text: `Error: nodes must be an array. Received: ${typeof parsedNodes}. If you provided a JSON string, it could not be parsed.`
                                 }]
                             };
                         }
@@ -4143,29 +4151,114 @@ async function startMCPServer() {
                         return {
                             content: [{
                                 type: "text",
-                                text: `Error: nodes must be an array. Received: ${typeof nodes}`
+                                text: `Error: nodes must be an array. Received: ${typeof parsedNodes}`
                             }]
                         };
                     }
                 }
 
-                const connections = params.connections || null;
-                const settings = params.settings || null;
-                const staticData = params.staticData || null;
-                const shared = params.shared || null;
+                // Handle connections - parse if string
+                let parsedConnections = connections || {};
+                if (typeof parsedConnections === 'string') {
+                    try {
+                        parsedConnections = JSON.parse(parsedConnections);
+                    } catch (e) {
+                        parsedConnections = {};
+                    }
+                }
 
-                const result = await n8nTools.createN8nWorkflow(user_id, name, nodes, connections, settings, staticData, shared);
+                // Validate required fields
+                if (!name || typeof name !== 'string' || name.trim() === '') {
+                    return {
+                        content: [{
+                            type: "text",
+                            text: `Error: Workflow name is required and must be a non-empty string.`
+                        }]
+                    };
+                }
+
+                if (!Array.isArray(parsedNodes) || parsedNodes.length === 0) {
+                    return {
+                        content: [{
+                            type: "text",
+                            text: `Error: Workflow must have at least one node. Received ${parsedNodes ? parsedNodes.length : 0} nodes.`
+                        }]
+                    };
+                }
+
+                // Validate nodes structure
+                for (let i = 0; i < parsedNodes.length; i++) {
+                    const node = parsedNodes[i];
+                    if (!node.type || !node.name) {
+                        return {
+                            content: [{
+                                type: "text",
+                                text: `Error: Node at index ${i} is missing required fields (type or name). Each node must have: type, name, and position.`
+                            }]
+                        };
+                    }
+                }
+
+                // Build the n8n workflow JSON structure
+                const workflowJson = {
+                    name: name.trim(),
+                    nodes: parsedNodes,
+                    connections: parsedConnections,
+                    settings: {
+                        executionOrder: "v1"
+                    },
+                    staticData: null,
+                    active: false
+                };
+
+                // Validate the JSON can be stringified
+                let jsonString;
+                try {
+                    jsonString = JSON.stringify(workflowJson, null, 2);
+                    if (!jsonString || jsonString.trim() === '' || jsonString === '{}') {
+                        throw new Error('Generated JSON is empty or invalid');
+                    }
+                } catch (stringifyError) {
+                    return {
+                        content: [{
+                            type: "text",
+                            text: `Error: Failed to generate workflow JSON: ${stringifyError.message}`
+                        }]
+                    };
+                }
+
+                // Validate the JSON can be parsed back (double-check)
+                try {
+                    const validationCheck = JSON.parse(jsonString);
+                    if (!validationCheck.nodes || !Array.isArray(validationCheck.nodes) || validationCheck.nodes.length === 0) {
+                        throw new Error('Validated JSON does not contain valid nodes array');
+                    }
+                } catch (validationError) {
+                    return {
+                        content: [{
+                            type: "text",
+                            text: `Error: Generated workflow JSON failed validation: ${validationError.message}`
+                        }]
+                    };
+                }
+
+                // Return the workflow JSON as a code block
+                // The frontend will detect this as n8n workflow JSON and show "Save to n8n" button
+                // IMPORTANT: Always include the JSON in the response - never just mention it
+                const responseText = `✅ Here's your n8n workflow ready to go!\n\nIt contains:\n\n${parsedNodes.map((node, idx) => `• **${node.name || node.type || `Node ${idx + 1}`}** — ${node.type || 'node'}`).join('\n')}\n\nYou can copy this JSON and import it directly into n8n, or click "Save to n8n" if visible in your environment to create it automatically.\n\n\`\`\`json\n${jsonString}\n\`\`\``;
+                
                 return {
                     content: [{
                         type: "text",
-                        text: result
+                        text: responseText
                     }]
                 };
             } catch (error) {
+                console.error('Error in create_n8n_workflow tool:', error);
                 return {
                     content: [{
                         type: "text",
-                        text: `Error creating n8n workflow: ${error.message}`
+                        text: `❌ Error generating n8n workflow JSON: ${error.message}\n\nPlease check:\n- All required fields are provided (name, nodes, connections)\n- Nodes array is valid and contains at least one node\n- Each node has required fields: type, name, position`
                     }]
                 };
             }

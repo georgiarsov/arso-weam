@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 // @ts-ignore - rehype-raw types may not be available
@@ -12,18 +12,84 @@ import { useEffect } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import TickIcon from '@/icons/TickIcon';
 
+// Helper function to detect if code is n8n workflow JSON
+const isN8nWorkflowJson = (code: string): boolean => {
+    try {
+        const parsed = JSON.parse(code);
+        // n8n workflow JSON typically has nodes and connections arrays
+        // or it could be a workflow export with name, nodes, connections
+        const hasNodes = Array.isArray(parsed.nodes);
+        const hasConnections = parsed.connections !== undefined;
+        const hasWorkflowStructure = hasNodes && hasConnections;
+        
+        // Also check for common n8n node properties
+        if (hasNodes && parsed.nodes.length > 0) {
+            const firstNode = parsed.nodes[0];
+            const hasN8nNodeStructure = firstNode.type !== undefined && 
+                (firstNode.parameters !== undefined || firstNode.position !== undefined);
+            return hasWorkflowStructure && hasN8nNodeStructure;
+        }
+        
+        return hasWorkflowStructure;
+    } catch {
+        return false;
+    }
+};
+
+// Extract workflow info from n8n JSON
+const extractWorkflowInfo = (code: string): { name?: string; id?: string } | null => {
+    try {
+        const parsed = JSON.parse(code);
+        return {
+            name: parsed.name,
+            id: parsed.id
+        };
+    } catch {
+        return null;
+    }
+};
+
 const CodeBlock = (props) => {
-    const { children, className, node, ...rest } = props;
+    const { children, className, node, onSaveWorkflow, existingWorkflowId, ...rest } = props;
     const isInline = !className;
     const match = /language-(\w+)/.exec(className || '');
-    const language = match?.input?.replace('language-', '');
+    const language = match ? match[1] : undefined;
 
     const [copied, setCopied] = useState(false);
+    const [saving, setSaving] = useState(false);
+
+    const codeString = String(children).replace(/\n$/, '');
+    
+    // Check if this is n8n workflow JSON
+    // Allow both explicit json language tag OR auto-detect from content
+    const isWorkflowJson = useMemo(() => {
+        // If language is specified and not json, skip
+        if (language && language !== 'json') return false;
+        // Check if the content is valid n8n workflow JSON
+        return isN8nWorkflowJson(codeString);
+    }, [codeString, language]);
+    
+    // Extract workflow info if it's a workflow JSON
+    const workflowInfo = useMemo(() => {
+        if (!isWorkflowJson) return null;
+        return extractWorkflowInfo(codeString);
+    }, [codeString, isWorkflowJson]);
 
     const handleCopy = () => {
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
     };
+
+    const handleSaveWorkflow = async (isUpdate: boolean) => {
+        if (!onSaveWorkflow) return;
+        setSaving(true);
+        try {
+            await onSaveWorkflow(codeString, language, isUpdate, workflowInfo);
+        } finally {
+            setSaving(false);
+        }
+    };
+
     if (isInline) {
         const text = Array.isArray(children) ? children.join('') : children;
         return (
@@ -42,29 +108,55 @@ const CodeBlock = (props) => {
                 <>
                     <div className="flex justify-between px-3 align-middle pt-1">
                         <p className="language-text">{language}</p>
-                        <CopyToClipboard text={children} onCopy={handleCopy}>
-                            <div className="flex">
-                                {copied ? (
-                                    <span className="language-text">
-                                        <CheckIcon
-                                            width={12}
-                                            height={12}
-                                            className="mr-2 inline-block [&>path]:fill-gray-200"
-                                        />
-                                        Copied!
-                                    </span>
-                                ) : (
-                                    <span className="cursor-pointer language-text">
-                                        <CopyIcon
-                                            width={15}
-                                            height={15}
-                                            className="mr-2 inline-block [&>path]:fill-gray-200"
-                                        />
-                                        copy
-                                    </span>
-                                )}
-                            </div>
-                        </CopyToClipboard>
+                        <div className="flex items-center gap-3">
+                            {/* Only show workflow buttons for n8n workflow JSON */}
+                            {onSaveWorkflow && isWorkflowJson && (
+                                <>
+                                    {workflowInfo?.id || existingWorkflowId ? (
+                                        <button
+                                            onClick={() => handleSaveWorkflow(true)}
+                                            disabled={saving}
+                                            className="cursor-pointer language-text hover:text-green-400 flex items-center gap-1 transition-colors disabled:opacity-50"
+                                            title="Update Workflow to n8n"
+                                        >
+                                            <span>{saving ? 'Updating...' : 'Update Workflow to n8n'}</span>
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => handleSaveWorkflow(false)}
+                                            disabled={saving}
+                                            className="cursor-pointer language-text hover:text-green-400 flex items-center gap-1 transition-colors disabled:opacity-50"
+                                            title="Save to n8n"
+                                        >
+                                            <span>{saving ? 'Saving...' : 'Save to n8n'}</span>
+                                        </button>
+                                    )}
+                                </>
+                            )}
+                            <CopyToClipboard text={children} onCopy={handleCopy}>
+                                <div className="flex">
+                                    {copied ? (
+                                        <span className="language-text">
+                                            <CheckIcon
+                                                width={12}
+                                                height={12}
+                                                className="mr-2 inline-block [&>path]:fill-gray-200"
+                                            />
+                                            Copied!
+                                        </span>
+                                    ) : (
+                                        <span className="cursor-pointer language-text">
+                                            <CopyIcon
+                                                width={15}
+                                                height={15}
+                                                className="mr-2 inline-block [&>path]:fill-gray-200"
+                                            />
+                                            Copy code
+                                        </span>
+                                    )}
+                                </div>
+                            </CopyToClipboard>
+                        </div>
                     </div>
                     <SyntaxHighlighter
                         PreTag="div"
@@ -73,7 +165,7 @@ const CodeBlock = (props) => {
                         wrapLines={true}
                         wrapLongLines={true}
                     >
-                        {String(children).replace(/\n$/, '')}
+                        {codeString}
                     </SyntaxHighlighter>
                 </>
             ) : (
@@ -85,9 +177,15 @@ const CodeBlock = (props) => {
     );
 };
 
-export const MarkOutPut = (assisnantResponse: string) => {
+export const MarkOutPut = (
+    assisnantResponse: string, 
+    onSaveWorkflow?: (code: string, language: string, isUpdate: boolean, workflowInfo?: { name?: string; id?: string } | null) => void,
+    existingWorkflowId?: string
+) => {
     const processedResponse = assisnantResponse.replace(/==(.*?)==/g, '<u>$1</u>');
-    
+
+    const CodeBlockWithSave = (props: any) => <CodeBlock {...props} onSaveWorkflow={onSaveWorkflow} existingWorkflowId={existingWorkflowId} />;
+
     return (
         <div className="markdown w-full mx-auto flex-1 prose max-w-full overflow-hidden">
             <Markdown
@@ -95,7 +193,7 @@ export const MarkOutPut = (assisnantResponse: string) => {
                 rehypePlugins={[rehypeRaw]}
                 components={{
                     // Override how links <a> are rendered
-                    code: CodeBlock,
+                    code: CodeBlockWithSave,
                     table: ({ children }) => {
                         const [copied, setCopied] = useState(false);
                         const [colSize, setColSize] = useState<'sm' | 'md' | 'lg' | 'xl'>('sm');
@@ -117,7 +215,7 @@ export const MarkOutPut = (assisnantResponse: string) => {
                                 const ro = new ResizeObserver(() => computeAndSetSize());
                                 ro.observe(el);
                                 (el as any).__ro = ro;
-                            } catch (_) {}
+                            } catch (_) { }
                         };
                         const handleCopyTable = (tableElement: HTMLTableElement | null) => {
                             if (!tableElement) return;

@@ -24,6 +24,7 @@ const routes = {
     settingBilling: '/settings/billing',
     docs: '/docs',
     pages: '/pages',
+    workflows: '/workflows',
     profileSetting: '/profile-setting',
     twoFactorAuthentication: '/profile-setting/two-factor-authentication',
     dashboard: '/dashboard',  

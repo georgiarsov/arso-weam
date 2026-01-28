@@ -102,7 +102,6 @@ const VoiceChat = React.memo(({ setText }) => {
     // Load voices for speech synthesis
     const loadVoices = () => {
       const availableVoices = window.speechSynthesis.getVoices();
-      console.log('Available voices:', availableVoices.length);
     };
 
     // Load voices immediately and also when they change

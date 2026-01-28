@@ -17,7 +17,7 @@ const TextAreaBox = React.forwardRef(({
     return (
         <textarea
             id="textarea"
-            placeholder="Chat with Weam... type '/' for prompts and '@' to mention an agent"
+            placeholder="Chat with Weam... type '/' for prompts, '@' to mention an agent and '#' for workflows"
             className="bg-transparent w-full resize-none focus:outline-none focus:ring-0 focus-visible:ring-0 py-3 text-font-14 px-5 placeholder-b6 min-h-14 md:min-h-[unset]"
             value={message}
             rows={Math.max(message?.split('\n').length, 1)}

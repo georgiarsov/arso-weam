@@ -239,8 +239,8 @@ const TOOL_CATALOG = {
     },
     'n8n': {
         domain: 'automation',
-        keywords: ['n8n', 'workflow', 'automation', 'workflows', 'automation'],
-        tools: ['list_n8n_workflows', 'get_n8n_workflow', 'create_n8n_workflow', 'execute_n8n_workflow','update_n8n_workflow']
+        keywords: ['n8n', 'workflow', 'automation', 'workflows', 'automation', 'create workflow'],
+        tools: ['list_n8n_workflows', 'get_n8n_workflow', 'execute_n8n_workflow', 'update_n8n_workflow', 'create_n8n_workflow']
     }
 };
 
