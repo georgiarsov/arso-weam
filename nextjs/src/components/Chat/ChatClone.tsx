@@ -219,6 +219,35 @@ const ChatPage = memo(() => {
         }
     }, []);
 
+    // Initialize selectedWorkflow from initialMessage.workflow when component mounts
+    // This ensures the workflow tag persists when navigating from ChatInput to ChatClone
+    useEffect(() => {
+        const workflowFromInitialMessage = (initialMessage as any)?.workflow;
+        if (workflowFromInitialMessage && !selectedWorkflow) {
+            // Reconstruct WorkflowType from initialMessage.workflow data
+            const workflowData = workflowFromInitialMessage;
+            const workflowFromInitial: WorkflowType = {
+                _id: workflowData.db_id || '',
+                name: workflowData.name || '',
+                description: '',
+                isActive: true,
+                user: {} as any,
+                brain: {
+                    _id: workflowData.brainId || '',
+                    id: workflowData.brainId || '',
+                    title: '',
+                    slug: '',
+                } as any,
+                n8nWorkflowId: workflowData.id || '', // This is the n8n workflow ID
+                createdAt: '',
+                updatedAt: '',
+                executionCount: 0,
+                isShare: workflowData.isShare || false,
+            };
+            setSelectedWorkflow(workflowFromInitial);
+        }
+    }, [initialMessage]);
+
     const handleApiKeyRequired = useCallback((data) => {
         if (data.message) {
             Toast(data.message, 'error');

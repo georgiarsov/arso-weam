@@ -141,6 +141,13 @@ export type ConversationType = {
         images: string[];
         videos: string[];
     };
+    workflow?: {
+        db_id?: string;
+        id?: string;
+        name?: string;
+        brainId?: string;
+        isShare?: boolean;
+    };
 }
 
 export type ForkChatType = {
