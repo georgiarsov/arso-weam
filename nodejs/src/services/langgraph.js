@@ -1713,6 +1713,11 @@ async function streamAndLog(app, data, socket, threadId = null) {
                         chunk: toolOutput,
                     });
                     
+                    // Append image markdown to the response message so it gets saved
+                    if (toolOutput && typeof toolOutput === 'string') {
+                        proccedMsg += '\n\n' + toolOutput;
+                    }
+                    
                     // Image is already uploaded to S3 by the CustomDallEAPIWrapper
                     // No need for background upload since it's handled synchronously
                 } else {
