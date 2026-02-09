@@ -118,12 +118,13 @@ class CustomDallETool extends Tool {
                     if (modifiedUrl.includes('http://minio:9000')) {
                         if (internalEndpoint) {
                             // Replace minio:9000 with the value from INTERNAL_ENDPOINT including http part
-                            modifiedUrl = modifiedUrl.replace(/http:\/\/minio:9000/g, internalEndpoint);
+                            // Also add /minio/ prefix since nginx routes MinIO requests through /minio/
+                            modifiedUrl = modifiedUrl.replace(/http:\/\/minio:9000\//g, `${internalEndpoint}/minio/`);
                         } else {
                             // Fallback: if INTERNAL_ENDPOINT is not set, try to construct it from FRONT_URL
                             const baseUrl = process.env.FRONT_URL
                             const url = new URL(baseUrl);
-                            modifiedUrl = modifiedUrl.replace(/http:\/\/(localhost|minio):9000/g, `${url.protocol}//${url.host}/minio`);
+                            modifiedUrl = modifiedUrl.replace(/http:\/\/(localhost|minio):9000\//g, `${url.protocol}//${url.host}/minio/`);
                         }
                     }
                     const s3Result = `![${query}](${modifiedUrl})`;
