@@ -295,11 +295,17 @@ const formatAIMessage = (payload) => {
 }
 
 const formatAIMessageResponse = (payload, response_metadata = {}) => {
+    const content = (payload && typeof payload === 'object')
+        ? (payload.content || payload.text || payload.message || JSON.stringify(payload))
+        : payload;
+    const toolCalls = Array.isArray(payload?.tool_calls) ? payload.tool_calls : [];
+    const invalidToolCalls = Array.isArray(payload?.invalid_tool_calls) ? payload.invalid_tool_calls : [];
+
     return {
         type: MESSAGE_TYPE.AI,
         data: {
-            content: payload,
-            additional_kwargs: {},
+            content: content,
+            additional_kwargs: payload?.additional_kwargs || {},
             response_metadata: {
                 citations: response_metadata.search_citations,
                 search_results: response_metadata.search_results,
@@ -308,8 +314,8 @@ const formatAIMessageResponse = (payload, response_metadata = {}) => {
             name: null,
             id: null,
             example: false,
-            tool_calls: [],
-            invalid_tool_calls: [],
+            tool_calls: toolCalls,
+            invalid_tool_calls: invalidToolCalls,
         },
     }
 }

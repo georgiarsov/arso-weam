@@ -904,7 +904,10 @@ async function selectRelevantToolsWithDomainFilter(query, availableMcpTools) {
     const classification = await classifyQuery(query);
     
     // Filter tools by detected domains
-    const allTools = [webSearchTool, imageGenerationTool, ...availableMcpTools];
+    const safeMcpTools = Array.isArray(availableMcpTools)
+        ? availableMcpTools.filter(tool => tool && tool.name)
+        : [];
+    const allTools = [webSearchTool, imageGenerationTool, ...safeMcpTools];
     const domainFilteredTools = await filterToolsByDomain(query, allTools, classification.domains);
     
     // Then apply semantic/keyword selection on the filtered set
