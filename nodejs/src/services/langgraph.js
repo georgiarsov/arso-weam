@@ -290,6 +290,91 @@ function getToolExecutorMap(agentDetails = null, mcpTools = []) {
     return baseTools;
 }
 
+/**
+ * Normalize tool calls from various formats to a consistent structure
+ * @param {*} rawToolCalls - Tool calls in various possible formats
+ * @returns {Array} - Normalized array of tool call objects
+ */
+function normalizeToolCalls(rawToolCalls) {
+    if (!rawToolCalls || !Array.isArray(rawToolCalls)) {
+        return [];
+    }
+    return rawToolCalls
+        .map(toolCall => {
+            if (!toolCall || !toolCall.id) {
+                return null;
+            }
+
+            const name = toolCall.name || toolCall.function?.name;
+            if (!name) {
+                return null;
+            }
+
+            const rawArgs = toolCall.args || toolCall.function?.arguments;
+            let parsedArgs = rawArgs;
+            if (typeof rawArgs === 'string') {
+                try {
+                    parsedArgs = JSON.parse(rawArgs);
+                } catch (error) {
+                    parsedArgs = { input: rawArgs };
+                }
+            }
+
+            return {
+                ...toolCall,
+                name,
+                args: parsedArgs
+            };
+        })
+        .filter(Boolean);
+}
+
+/**
+ * Sanitize context by ensuring tool messages have matching tool_calls
+ * This prevents "tool message without preceding tool_calls" errors
+ * @param {Array} context - Array of LangChain messages
+ * @returns {Array} - Sanitized array with orphaned tool messages removed
+ */
+function sanitizeToolMessages(context) {
+    const sanitized = [];
+    let pendingToolCallIds = null;
+
+    for (const msg of context) {
+        const messageType = msg?.constructor?.name;
+
+        if (messageType === 'AIMessage') {
+            const toolCalls = normalizeToolCalls(msg.tool_calls || msg.additional_kwargs?.tool_calls);
+            pendingToolCallIds = toolCalls.length > 0
+                ? new Set(toolCalls.map(toolCall => toolCall.id))
+                : null;
+            sanitized.push(msg);
+            continue;
+        }
+
+        if (messageType === 'ToolMessage') {
+            const toolCallId = msg.tool_call_id || msg.toolCallId || msg.additional_kwargs?.tool_call_id;
+
+            if (!pendingToolCallIds || !toolCallId || !pendingToolCallIds.has(toolCallId)) {
+                logger.warn('Dropping tool message without matching tool_calls', {
+                    toolCallId,
+                    hasPending: Boolean(pendingToolCallIds)
+                });
+                continue;
+            }
+
+            sanitized.push(msg);
+            pendingToolCallIds.delete(toolCallId);
+            continue;
+        }
+
+        // Reset pending tool calls when a non-tool message is encountered
+        pendingToolCallIds = null;
+        sanitized.push(msg);
+    }
+
+    return sanitized;
+}
+
 async function callModel(state, model, data, agentDetails = null) {
     const { messages } = state;
     const lastMessageIndex = messages[messages.length - 1];
@@ -382,18 +467,35 @@ async function callModel(state, model, data, agentDetails = null) {
         // Convert array tuples to proper LangChain message objects for Gemini compatibility
         const currentMessages = messages.map(msg => {
             if (Array.isArray(msg)) {
-                const [role, content] = msg;
+                const [role, content, meta] = msg;
                 if (role === 'system') {
                     return new SystemMessage(content);
                 } else if (role === 'assistant' || role === 'ai') {
-                    return new AIMessage(content);
+                    // Preserve tool_calls when converting to AIMessage
+                    return new AIMessage({
+                        content,
+                        additional_kwargs: meta?.additional_kwargs || {},
+                        tool_calls: normalizeToolCalls(meta?.tool_calls)
+                    });
+                } else if (role === 'tool') {
+                    // Handle tool messages in array format
+                    const toolCallId = meta?.tool_call_id;
+                    if (toolCallId) {
+                        return new ToolMessage({
+                            content,
+                            tool_call_id: toolCallId,
+                            name: meta?.name
+                        });
+                    }
+                    logger.warn('Skipping tuple tool message without tool_call_id');
+                    return null;
                 } else {
                     // Default to HumanMessage for 'user' or any other role
                     return new HumanMessage(content);
                 }
             }
             return msg;
-        });
+        }).filter(Boolean);
         context.push(...currentMessages);
         
         
@@ -437,29 +539,62 @@ async function callModel(state, model, data, agentDetails = null) {
         if (msg && msg.constructor && ['SystemMessage', 'HumanMessage', 'AIMessage', 'ToolMessage'].includes(msg.constructor.name)) {
             return msg;
         }
-        
+
         // Convert array tuples to proper message objects
         if (Array.isArray(msg) && msg.length >= 2) {
-            const [role, content] = msg;
+            const [role, content, meta] = msg;
             if (role === 'system') {
                 return new SystemMessage(content);
             } else if (role === 'assistant' || role === 'ai') {
-                return new AIMessage(content);
+                // Preserve tool_calls when converting to AIMessage
+                return new AIMessage({
+                    content,
+                    additional_kwargs: meta?.additional_kwargs || {},
+                    tool_calls: normalizeToolCalls(meta?.tool_calls)
+                });
+            } else if (role === 'tool') {
+                // Handle tool messages in array format
+                const toolCallId = meta?.tool_call_id;
+                if (toolCallId) {
+                    return new ToolMessage({
+                        content,
+                        tool_call_id: toolCallId,
+                        name: meta?.name
+                    });
+                }
+                logger.warn('Skipping tuple tool message without tool_call_id');
+                return null;
             } else {
                 // Default to HumanMessage for 'user' or any other role
                 return new HumanMessage(content);
             }
         }
-        
+
         // Handle objects with type/role properties
         if (msg && typeof msg === 'object') {
             const role = msg.type || msg.role || msg._getType?.();
             const content = msg.content || msg.text || '';
-            
+
             if (role === 'system') {
                 return new SystemMessage(content);
             } else if (role === 'ai' || role === 'assistant') {
-                return new AIMessage(content);
+                // Preserve tool_calls when converting to AIMessage
+                return new AIMessage({
+                    content,
+                    additional_kwargs: msg.additional_kwargs || {},
+                    tool_calls: normalizeToolCalls(msg.tool_calls || msg.additional_kwargs?.tool_calls)
+                });
+            } else if (role === 'tool') {
+                const toolCallId = msg.tool_call_id || msg.toolCallId || msg.additional_kwargs?.tool_call_id;
+                if (toolCallId) {
+                    return new ToolMessage({
+                        content,
+                        tool_call_id: toolCallId,
+                        name: msg.name
+                    });
+                }
+                logger.warn('Skipping tool message without tool_call_id');
+                return null;
             } else if (role === 'human' || role === 'user') {
                 return new HumanMessage(content);
             }
@@ -468,8 +603,45 @@ async function callModel(state, model, data, agentDetails = null) {
         // Fallback: wrap unknown message as HumanMessage to prevent errors
         logger.warn(`Unknown message format in context, converting to HumanMessage:`, typeof msg);
         return new HumanMessage(String(msg?.content || msg || ''));
-    }).filter(msg => msg && msg.content); // Remove any null/undefined/empty messages
-    
+    }).filter(msg => {
+        // Remove null/undefined messages
+        if (!msg) {
+            return false;
+        }
+
+        // Keep ToolMessages even if content check might fail
+        const messageType = msg?.constructor?.name;
+        if (messageType === 'ToolMessage') {
+            return true;
+        }
+
+        // Keep AIMessages that have tool_calls
+        if (messageType === 'AIMessage') {
+            const toolCalls = normalizeToolCalls(msg.tool_calls || msg.additional_kwargs?.tool_calls);
+            if (toolCalls.length > 0) {
+                return true;
+            }
+        }
+
+        // For other messages, check content
+        if (msg.content === null || typeof msg.content === 'undefined') {
+            return false;
+        }
+
+        if (typeof msg.content === 'string') {
+            return msg.content.trim() !== '';
+        }
+
+        if (Array.isArray(msg.content)) {
+            return msg.content.length > 0;
+        }
+
+        return true;
+    }); // Remove any null/undefined/empty messages
+
+    // Sanitize tool messages to ensure proper tool calling chain
+    context = sanitizeToolMessages(context);
+
     // Log the context being sent to LLM for debugging
     context.forEach((msg, idx) => {
         let content = '';
@@ -649,7 +821,8 @@ function shouldContinue(state) {
     const { messages } = state
     const lastMessage = messages[messages.length - 1]
 
-    if (!lastMessage.tool_calls || lastMessage.tool_calls.length === 0) {
+    const toolCalls = normalizeToolCalls(lastMessage.tool_calls || lastMessage.additional_kwargs?.tool_calls);
+    if (toolCalls.length === 0) {
         return 'end'
     }
     return 'tools'
