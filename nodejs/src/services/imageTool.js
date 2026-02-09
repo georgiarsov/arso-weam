@@ -111,18 +111,21 @@ class CustomDallETool extends Tool {
                 });
 
                 if (uploadResult.success) {
-                    // Get the INTERNAL_ENDPOINT directly from environment variable
+                    // Get configuration
                     const internalEndpoint = process.env.INTERNAL_ENDPOINT;
-                    // Only replace if it's a MinIO URL
+                    const bucketType = process.env.BUCKET_TYPE || 'AWS';
                     let modifiedUrl = uploadResult.s3Url;
-                    if (modifiedUrl.includes('http://minio:9000')) {
+
+                    // Only transform URLs for MinIO deployments
+                    // AWS S3 URLs (https://bucket.s3.region.amazonaws.com) work as-is
+                    if (bucketType.toUpperCase() === 'MINIO' && modifiedUrl.includes('http://minio:9000')) {
                         if (internalEndpoint) {
                             // Replace minio:9000 with the value from INTERNAL_ENDPOINT including http part
                             // Also add /minio/ prefix since nginx routes MinIO requests through /minio/
                             modifiedUrl = modifiedUrl.replace(/http:\/\/minio:9000\//g, `${internalEndpoint}/minio/`);
                         } else {
                             // Fallback: if INTERNAL_ENDPOINT is not set, try to construct it from FRONT_URL
-                            const baseUrl = process.env.FRONT_URL
+                            const baseUrl = process.env.FRONT_URL;
                             const url = new URL(baseUrl);
                             modifiedUrl = modifiedUrl.replace(/http:\/\/(localhost|minio):9000\//g, `${url.protocol}//${url.host}/minio/`);
                         }
