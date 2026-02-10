@@ -12,7 +12,7 @@ const nextConfig = {
     images: {
         remotePatterns: [
             {
-                protocol: process.env.NEXT_PUBLIC_HTTPS_PROTOCOL || 'https',  // Default to 'https' if not set
+                protocol: process.env.NEXT_PUBLIC_HTTPS_PROTOCOL === 'true' ? 'https' : (process.env.NEXT_PUBLIC_HTTPS_PROTOCOL || 'https'),  // Handle 'true' value from env
                 hostname: process.env.NEXT_PUBLIC_IMAGE_DOMAIN || 'default.cdn.com' // Default domain if not set
             }
         ],
