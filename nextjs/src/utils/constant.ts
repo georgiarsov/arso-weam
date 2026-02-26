@@ -269,6 +269,7 @@ export const AI_MODEL_CODE = {
     LLAMA4: 'LLAMA4',
     GROK: 'GROK',
     QWEN: 'QWEN',
+    SARVAM: 'SARVAM',
     OLLAMA: 'OLLAMA',
     OPEN_ROUTER: 'OPEN_ROUTER',
     // error conversation response
@@ -390,6 +391,7 @@ export const MODEL_IMAGE_BY_CODE={
     DEEPSEEK: '/Deepseek.png',
     GROK: '/grok.png',
     QWEN: '/qwen.png',
+    SARVAM: '/sarvam.png',
     OLLAMA: '/ollama-model.svg'
 }
 
@@ -470,12 +472,9 @@ export const AI_MODAL_NAME = {
     // GPT_4_1_SEARCH_MEDIUM: 'gpt-4.1-search-medium',
 
     // Gemini models
-    // GEMINI_2_5_PRO_PREVIEW_05_06: 'gemini-2.5-pro-preview-05-06',
-    GEMINI_2_5_PRO: 'gemini-2.5-pro',
-    GEMINI_2_0_FLASH: 'gemini-2.0-flash',
-    // GEMINI_2_5_FLASH_PREVIEW_05_20: 'gemini-2.5-flash-preview-05-20',
-    GEMINI_2_5_FLASH: 'gemini-2.5-flash',
     GEMINI_3_PRO_PREVIEW: 'gemini-3-pro-preview',
+    GEMINI_3_1_PRO_PREVIEW: 'gemini-3.1-pro-preview',
+    GEMINI_3_FLASH_PREVIEW: 'gemini-3-flash-preview',
 
     // Anthropic models
     //CLAUDE_3_7_SONNET_LATEST: 'claude-3-7-sonnet-latest',
@@ -511,7 +510,10 @@ export const AI_MODAL_NAME = {
     OLLAMA_LLAMA_3_2_1B: 'llama3.2:1b',
 
     // Qwen models
-    QWEN_3_30B_A3B: 'qwen/qwen3-30b-a3b:free',
+    QWEN_3_30B_A3B: 'qwen/qwen3-30b-a3b:free', 
+    
+    // Sarvam models
+    SARVAM_M: 'sarvam-m',
 }
 
 export const USER_STATUS = {
@@ -593,6 +595,7 @@ export const MODAL_NAME_CONVERSION = {
     LLAMA4: 'Llama4',
     GROK: 'Grok',
     QWEN: 'Qwen',
+    SARVAM: 'Sarvam',
     OPEN_ROUTER: 'Open Router',
     OLLAMA: 'Ollama'
 }
@@ -813,18 +816,6 @@ export const MODEL_CREDIT_INFO = [
         model: 'gemini-1.5-flash',
         credit: 5,
     },
-    {
-        code: 'GEMINI',
-        model: 'gemini-2.0-flash',
-        credit: 0.5,
-        displayName: 'Gemini 2.0 Flash',
-        snippet: 'Fast, multimodal, ideal for content generation.',
-        doc: true,
-        websearch: true,
-        vision: true,
-        image: true,
-        reasoning: false,
-    },
     // {
     //     code: 'GEMINI',
     //     model: 'gemini-2.5-flash-preview-05-20',
@@ -837,18 +828,6 @@ export const MODEL_CREDIT_INFO = [
     //     image: true,
     //     reasoning: true,
     // },
-    {
-        code: 'GEMINI',
-        model: 'gemini-2.5-flash',
-        credit: 10,
-        displayName: 'Gemini 2.5 Flash',
-        snippet: 'Fast for content and mid-level coding. Reasoning is good.',
-        doc: true,
-        websearch: true,
-        vision: true,
-        image: true,
-        reasoning: true,
-    },
     // {
     //     code: 'GEMINI',
     //     model: 'gemini-2.5-pro-preview-05-06',
@@ -861,12 +840,25 @@ export const MODEL_CREDIT_INFO = [
     //     image: true,
     //     reasoning: true,
     // },
+    
     {
         code: 'GEMINI',
-        model: 'gemini-2.5-pro',
+        model: 'gemini-3-flash-preview',
+        credit: 5,
+        displayName: 'Gemini 3 Flash Preview',
+        snippet: 'Fast multimodal model for real-time tasks and apps.',
+        doc: true,
+        websearch: true,
+        vision: true,
+        image: true,
+        reasoning: false,
+    },
+    {
+        code: 'GEMINI',
+        model: 'gemini-3.1-pro-preview',
         credit: 10,
-        displayName: 'Gemini 2.5 Pro',
-        snippet: 'Powerful for complex reasoning and advanced coding.',
+        displayName: 'Gemini 3.1 Pro Preview',
+        snippet: 'Strong reasoning for deep analysis and smart coding.',
         doc: true,
         websearch: true,
         vision: true,
@@ -1063,6 +1055,18 @@ export const MODEL_CREDIT_INFO = [
         displayName: 'Qwen 3',
         snippet: 'Great for content creation and coding.',
         doc: true,
+        websearch: false,
+        vision: false, // chat with images
+        image: false, // image generation
+        reasoning: false,
+    },
+    {
+        code: 'SARVAM',
+        model: 'sarvam-m',
+        credit: 5,
+        displayName: 'Sarvam M',
+        snippet: 'Great for content creation and coding.',
+        doc: false,
         websearch: false,
         vision: false, // chat with images
         image: false, // image generation
@@ -1279,21 +1283,7 @@ export const AI_CREDITS = [
         creditCount: '10',
         MessageNo: '50',
     },
-    {
-        modelName: 'Gemini 2.0 Flash',
-        creditCount: '0.5',
-        MessageNo: '1000',
-    },
-    {
-        modelName: 'Gemini 2.5 Flash Preview',
-        creditCount: '5',
-        MessageNo: '100',
-    },
-    {
-        modelName: 'Gemini 2.5 Pro Preview',
-        creditCount: '10',
-        MessageNo: '50',
-    },
+    
     {
         modelName: 'Claude 3 Opus',
         creditCount: '50',
@@ -1374,6 +1364,11 @@ export const AI_CREDITS = [
         creditCount: '50',
         MessageNo: '10',
     },
+    {
+        modelName: 'Sarvam M',
+        creditCount: '5',
+        MessageNo: '100',
+    },
 ]
 
 // 200 Credits for free tier
@@ -1448,21 +1443,7 @@ export const FREE_TIER_AI_CREDITS = [
         creditCount: '10',
         MessageNo: '20',
     },
-    {
-        modelName: 'Gemini 2.0 Flash',
-        creditCount: '0.5',
-        MessageNo: '400',
-    },
-    {
-        modelName: 'Gemini 2.5 Flash',
-        creditCount: '5',
-        MessageNo: '40',
-    },
-    {
-        modelName: 'Gemini 2.5 Pro',
-        creditCount: '10',
-        MessageNo: '20',
-    },
+    
     {
         modelName: 'Claude 3 Opus',
         creditCount: '50',
@@ -1543,6 +1524,11 @@ export const FREE_TIER_AI_CREDITS = [
         creditCount: 50,
         MessageNo: 4,
     },
+    {
+        modelName: 'Sarvam M',
+        creditCount: '5',
+        MessageNo: '40',
+    },
 ]
 export const GENERAL_BRAIN_TITLE = "General Brain";
 
@@ -1622,14 +1608,13 @@ export const MODEL_NAME_BY_CODE = {
 
     // Gemini models
     'gemini-2.5-pro-preview-05-06': 'GEMINI',
-    'gemini-2.0-flash': 'GEMINI',
     'gemini-1.5-flash-8b': 'GEMINI',
     'gemini-1.5-pro': 'GEMINI',
     'gemini-1.5-flash': 'GEMINI',
     'gemini-2.5-pro-preview-03-25': 'GEMINI',
     'gemini-2.5-flash-preview-05-20': 'GEMINI',
-    'gemini-2.5-pro': 'GEMINI',
-    'gemini-2.5-flash': 'GEMINI',
+    'gemini-3-flash-preview': 'GEMINI',
+    'gemini-3.1-pro-preview': 'GEMINI',
     'gemini-3-pro-preview': 'GEMINI',
 
     // Anthropic models
@@ -1680,6 +1665,9 @@ export const MODEL_NAME_BY_CODE = {
     // Ollama (local) models
     'llama3.1:8b': 'OLLAMA',
     'mistral:7b': 'OLLAMA',
+
+    // Sarvam models
+    'sarvam-m': 'SARVAM',
 }
 
 export const getModelImageByName = (name: string) => {
@@ -1708,7 +1696,7 @@ export const SUBSCRIPTION_PLAN_CREDITS = {
 }
 
 
-export const SEQUENCE_MODEL_LIST = [AI_MODEL_CODE.OPEN_AI, AI_MODEL_CODE.GEMINI, AI_MODEL_CODE.ANTHROPIC, AI_MODEL_CODE.PERPLEXITY, AI_MODEL_CODE.DEEPSEEK, AI_MODEL_CODE.OLLAMA, AI_MODEL_CODE.LLAMA4, AI_MODEL_CODE.QWEN, AI_MODEL_CODE.GROK, AI_MODEL_CODE.OLLAMA] as const;
+export const SEQUENCE_MODEL_LIST = [AI_MODEL_CODE.OPEN_AI, AI_MODEL_CODE.GEMINI, AI_MODEL_CODE.ANTHROPIC, AI_MODEL_CODE.PERPLEXITY, AI_MODEL_CODE.DEEPSEEK, AI_MODEL_CODE.OLLAMA, AI_MODEL_CODE.LLAMA4, AI_MODEL_CODE.QWEN, AI_MODEL_CODE.GROK, AI_MODEL_CODE.OLLAMA, AI_MODEL_CODE.SARVAM] as const;
 
 export const FILE_UPLOAD_FOLDER = {
     SALES_CALL_AGENT: 'sales-call',
